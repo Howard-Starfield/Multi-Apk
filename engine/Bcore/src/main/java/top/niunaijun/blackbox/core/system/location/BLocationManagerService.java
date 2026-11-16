@@ -14,6 +14,7 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -37,7 +38,7 @@ public class BLocationManagerService extends IBLocationManagerService.Stub imple
     private static final BLocationManagerService sService = new BLocationManagerService();
     private final SparseArray<HashMap<String, BLocationConfig>> mLocationConfigs = new SparseArray<>();
     private final BLocationConfig mGlobalConfig = new BLocationConfig();
-    private final Map<IBinder, LocationRecord> mLocationListeners = new HashMap<>();
+    private final Map<IBinder, LocationRecord> mLocationListeners = new ConcurrentHashMap<>();
     private final Executor mThreadPool = Executors.newCachedThreadPool();
 
     public static BLocationManagerService get() {
@@ -238,14 +239,23 @@ public class BLocationManagerService extends IBLocationManagerService.Stub imple
                 IInterface iInterface = BRILocationListenerStub.get().asInterface(locationListener);
                 LocationRecord locationRecord = mLocationListeners.get(locationListener);
                 if (locationRecord == null)
-                    continue;
+                    break; // listener was removed
                 BLocation location = getLocation(locationRecord.userId, locationRecord.packageName);
-                if (location == null)
+                if (location == null) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
                     continue;
+                }
                 if (location.equals(lastLocation) && (System.currentTimeMillis() - l) < 3000) {
                     try {
                         Thread.sleep(1000);
-                    } catch (InterruptedException ignored) {
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
                     }
                     continue;
                 }

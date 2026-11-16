@@ -13,6 +13,7 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 
 import top.niunaijun.blackbox.BlackBoxCore;
+import top.niunaijun.blackbox.R;
 import top.niunaijun.blackbox.utils.compat.BuildCompat;
 
 
@@ -44,10 +45,6 @@ public class DaemonService extends Service {
         Log.d(TAG, "DaemonService onStartCommand");
         
         try {
-            
-            Intent innerIntent = new Intent(this, DaemonInnerService.class);
-            startService(innerIntent);
-            
             
             if (BuildCompat.isOreo()) {
                 if (!startForegroundService()) {
@@ -119,8 +116,8 @@ public class DaemonService extends Service {
     private Notification createNotification() {
         try {
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("BlackBox Core")
-                .setContentText("Core services are running")
+                .setContentTitle(getString(R.string.daemon_notification_title))
+                .setContentText(getString(R.string.daemon_notification_text))
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
@@ -130,49 +127,6 @@ public class DaemonService extends Service {
         } catch (Exception e) {
             Log.e(TAG, "Failed to create notification: " + e.getMessage(), e);
             return null;
-        }
-    }
-
-    
-    public static class DaemonInnerService extends Service {
-        @Override
-        public void onCreate() {
-            Log.i(TAG, "DaemonInnerService -> onCreate");
-            super.onCreate();
-        }
-
-        @Override
-        public int onStartCommand(Intent intent, int flags, int startId) {
-            Log.i(TAG, "DaemonInnerService -> onStartCommand");
-            
-            try {
-                
-                NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-                if (nm != null) {
-                    nm.cancel(NOTIFY_ID);
-                    Log.d(TAG, "Notification cancelled successfully");
-                }
-                
-                
-                stopSelf();
-                return START_NOT_STICKY;
-                
-            } catch (Exception e) {
-                Log.e(TAG, "Error in DaemonInnerService: " + e.getMessage(), e);
-                stopSelf();
-                return START_NOT_STICKY;
-            }
-        }
-
-        @Override
-        public IBinder onBind(Intent intent) {
-            return null;
-        }
-
-        @Override
-        public void onDestroy() {
-            Log.i(TAG, "DaemonInnerService -> onDestroy");
-            super.onDestroy();
         }
     }
 }

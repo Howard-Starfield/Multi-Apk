@@ -72,7 +72,8 @@ android {
 
 // Strip the AIDL-generated "Using: ..." comment line which contains backslash sequences
 // that Java's compiler mis-parses as Unicode escapes on Windows paths.
-tasks.matching { it.name.startsWith('compileReleaseJavaWithJavac') || it.name.startsWith('compileDebugJavaWithJavac') }.all {
+tasks.configureEach {
+    if (!(name.startsWith('compileReleaseJavaWithJavac') || name.startsWith('compileDebugJavaWithJavac'))) return
     doFirst {
         def aidlOut = file("$buildDir/generated/aidl_source_output_dir")
         if (aidlOut.exists()) {

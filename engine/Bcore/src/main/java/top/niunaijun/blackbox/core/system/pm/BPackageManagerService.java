@@ -717,13 +717,14 @@ public class BPackageManagerService extends IBPackageManagerService.Stub impleme
             return result;
         } catch (Throwable t) {
             t.printStackTrace();
+            String message = t.getMessage();
+            return result.installError(message != null ? message : t.toString());
         } finally {
             if (apkFile != null && option.isFlag(InstallOption.FLAG_URI_FILE)) {
                 FileUtils.deleteDir(apkFile);
             }
             Slog.d(TAG, "install finish: " + (System.currentTimeMillis() - l) + "ms");
         }
-        return result;
     }
 
     private PackageParser.Package parserApk(String file) {

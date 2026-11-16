@@ -47,6 +47,7 @@ interface IBActivityManagerService {
     void onFinishActivity(IBinder token);
 
     RunningAppProcessInfo getRunningAppProcesses(String callerPackage, int userId);
+    boolean isPackageRunning(String packageName, int userId);
     RunningServiceInfo getRunningServices(String callerPackage, int userId);
 
     void scheduleBroadcastReceiver(in Intent intent, in PendingResultData pendingResultData, int userId);

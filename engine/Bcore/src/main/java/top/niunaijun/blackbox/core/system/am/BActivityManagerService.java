@@ -180,6 +180,32 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
     }
 
     @Override
+    public boolean isPackageRunning(String packageName, int userId) throws RemoteException {
+        try {
+            List<ProcessRecord> records = BProcessManagerService.get().getPackageProcessAsUser(packageName, userId);
+            if (records.isEmpty()) {
+                return false;
+            }
+            ActivityManager manager = (ActivityManager)
+                    BlackBoxCore.getContext().getSystemService(Context.ACTIVITY_SERVICE);
+            List<ActivityManager.RunningAppProcessInfo> running = manager.getRunningAppProcesses();
+            if (running == null) {
+                return false;
+            }
+            for (ProcessRecord record : records) {
+                for (ActivityManager.RunningAppProcessInfo info : running) {
+                    if (info.pid == record.pid) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    @Override
     public RunningServiceInfo getRunningServices(String callerPackage, int userId) throws RemoteException {
         UserSpace userSpace = getOrCreateSpaceLocked(userId);
         return userSpace.mActiveServices.getRunningServiceInfo(callerPackage, userId);

@@ -384,6 +384,15 @@ public class BActivityManager extends BlackManager<IBActivityManagerService> {
         return null;
     }
 
+    public boolean isPackageRunning(String packageName, int userId) {
+        try {
+            return getService().isPackageRunning(packageName, userId);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
     public RunningServiceInfo getRunningServices(String callerPackage, int userId) throws RemoteException {
         try {
             return getService().getRunningServices(callerPackage, userId);
