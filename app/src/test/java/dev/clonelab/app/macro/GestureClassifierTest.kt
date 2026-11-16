@@ -31,9 +31,25 @@ class GestureClassifierTest {
     }
 
     @Test
-    fun cancelEndsAGestureLikeUp() {
-        val steps = GestureClassifier.classify(listOf(down(0, 1f, 1f), cancel(30, 1f, 1f)), slop)
-        assertEquals(MacroAction.Tap(1f, 1f, 30), steps.single().action)
+    fun aCancelledGestureIsDropped() {
+        val steps = GestureClassifier.classify(listOf(down(0, 1f, 1f), move(10, 90f, 1f), cancel(30, 90f, 1f)), slop)
+        assertTrue(steps.isEmpty())
+    }
+
+    @Test
+    fun aCancelledGestureStillCountsTowardTheNextDelay() {
+        val steps = GestureClassifier.classify(
+            listOf(
+                down(0, 5f, 5f), up(50, 5f, 5f),
+                down(100, 1f, 1f), cancel(200, 1f, 1f),
+                down(500, 7f, 7f), up(550, 7f, 7f),
+            ),
+            slop,
+        )
+        assertEquals(
+            listOf(MacroStep(0, MacroAction.Tap(5f, 5f, 50)), MacroStep(450, MacroAction.Tap(7f, 7f, 50))),
+            steps,
+        )
     }
 
     @Test

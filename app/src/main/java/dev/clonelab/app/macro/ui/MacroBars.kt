@@ -34,7 +34,21 @@ internal class RecordingBar(
         }
     }
 
+    init {
+        // The window manager dropped the window: the pulse and the timer belong to a dead view. Stop
+        // them and forget the views, so the next show binds a new view and starts both again.
+        window.onLost = ::releaseViews
+    }
+
     val isShown get() = window.isShown
+
+    private fun releaseViews() {
+        handler.removeCallbacks(tick)
+        stopPulse()
+        label = null
+        stop = null
+        startedAt = 0
+    }
 
     private fun ensure(): Boolean {
         if (window.isShown) return true
@@ -96,11 +110,7 @@ internal class RecordingBar(
     fun reposition() = window.reposition()
 
     fun hide() {
-        handler.removeCallbacks(tick)
-        stopPulse()
-        label = null
-        stop = null
-        startedAt = 0
+        releaseViews()
         window.hide()
     }
 
@@ -125,6 +135,13 @@ internal class PlayingBar(
     private val window = BarWindow(host, R.layout.overlay_macro_playing_bar, position)
     private var name: TextView? = null
     private var counter: TextView? = null
+
+    init {
+        window.onLost = {
+            name = null
+            counter = null
+        }
+    }
 
     val isShown get() = window.isShown
 

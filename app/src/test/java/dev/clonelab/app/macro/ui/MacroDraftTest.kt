@@ -109,6 +109,24 @@ class MacroDraftTest {
     }
 
     @Test
+    fun aRunTheSchedulerRecordedWhileTheEditorWasOpenIsNotRolledBack() {
+        val previous = stored(MacroSchedule.EveryMinutes(30)) // opened with lastScheduledRunAt = 555
+        val storedNow = previous.copy(lastScheduledRunAt = 4000)
+        val macro = MacroDraft.fromMacro(previous).withName("renamed").toMacro(3, 9999, previous, storedNow)
+        assertEquals(4000L, macro.lastScheduledRunAt)
+        // and the other way round: never below what the editor opened with
+        assertEquals(555L, MacroDraft.fromMacro(previous).toMacro(3, 9999, previous, previous.copy(lastScheduledRunAt = 100)).lastScheduledRunAt)
+    }
+
+    @Test
+    fun aChangedScheduleStartsAtNowEvenWhenAnewerRunIsStored() {
+        val previous = stored(MacroSchedule.EveryMinutes(30))
+        val macro = MacroDraft.fromMacro(previous).withSchedule(MacroSchedule.DailyAt(9, 0))
+            .toMacro(3, 9999, previous, previous.copy(lastScheduledRunAt = 4000))
+        assertEquals(9999L, macro.lastScheduledRunAt)
+    }
+
+    @Test
     fun changedScheduleRestartsTheClockAndSwitchingOffClearsTheTarget() {
         val previous = stored(MacroSchedule.EveryMinutes(30))
         val changed = MacroDraft.fromMacro(previous).withSchedule(MacroSchedule.DailyAt(9, 0)).toMacro(0, 7000, previous)

@@ -15,7 +15,7 @@ object MacroScheduler {
      */
     fun due(macro: Macro, nowMs: Long, zone: TimeZone): Boolean {
         if (macro.scheduleUserId == null) return false
-        val lastRun = if (macro.lastScheduledRunAt == 0L) macro.createdAt else macro.lastScheduledRunAt
+        val lastRun = baseline(macro, nowMs)
         return when (val schedule = macro.schedule) {
             MacroSchedule.Off -> false
             is MacroSchedule.EveryMinutes -> nowMs - lastRun >= schedule.minutes * MINUTE_MS
@@ -24,6 +24,18 @@ object MacroScheduler {
                 nowMs >= todayAt && lastRun < todayAt
             }
         }
+    }
+
+    /**
+     * When the macro last ran, or was created if it never did, never later than [nowMs]. A last run in
+     * the future means the clock was wrong when it was stored (or has been set back since): that
+     * timestamp says nothing, so the creation time stands in for it and the schedule cannot stay frozen
+     * until the real time catches up.
+     */
+    fun baseline(macro: Macro, nowMs: Long): Long {
+        val lastRunOrCreated = if (macro.lastScheduledRunAt == 0L) macro.createdAt else macro.lastScheduledRunAt
+        val usable = if (lastRunOrCreated > nowMs) macro.createdAt else lastRunOrCreated
+        return minOf(usable, nowMs)
     }
 
     private fun todayAt(schedule: MacroSchedule.DailyAt, nowMs: Long, zone: TimeZone): Long =

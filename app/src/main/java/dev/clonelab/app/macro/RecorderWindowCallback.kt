@@ -25,6 +25,9 @@ class RecorderWindowCallback(
 
     /** Session of the gesture in progress, decided at its DOWN. Main thread only. */
     private var touchSession: String? = null
+
+    /** Id of the finger that went down first; only that one is logged. Main thread only. */
+    private var trackedPointerId = -1
     private var lastMoveWrittenAt = 0L
     private val keySessions = HashMap<Int, String>()
 
@@ -55,29 +58,51 @@ class RecorderWindowCallback(
         when (action) {
             MotionEvent.ACTION_DOWN -> {
                 touchSession = hook.activeSession(packageName, userId)
+                trackedPointerId = event.getPointerId(0)
                 lastMoveWrittenAt = event.eventTime
-                writeTouch(action, event)
+                writeTouch(action, event, 0)
             }
             MotionEvent.ACTION_MOVE -> {
                 if (touchSession != null && event.eventTime - lastMoveWrittenAt >= MOVE_INTERVAL_MS) {
+                    val index = event.findPointerIndex(trackedPointerId)
+                    if (index < 0) return
                     lastMoveWrittenAt = event.eventTime
-                    writeTouch(action, event)
+                    writeTouch(action, event, index)
+                }
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                // The gesture is the first finger's: it ends when that finger lifts, whatever the others do.
+                if (event.getPointerId(event.actionIndex) == trackedPointerId) {
+                    writeTouch(MotionEvent.ACTION_UP, event, event.actionIndex)
+                    touchSession = null
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                writeTouch(action, event)
+                writeTouch(action, event, event.findPointerIndex(trackedPointerId).coerceAtLeast(0))
                 touchSession = null
             }
-            // Additional pointers are ignored.
+            // Additional pointers going down are ignored.
         }
     }
 
-    private fun writeTouch(action: Int, event: MotionEvent) {
+    /**
+     * Writes the position of pointer [index]. Re-checks that the session is still the one being
+     * recorded, so a gesture that began before Stop ends the session instead of feeding it.
+     */
+    private fun writeTouch(action: Int, event: MotionEvent, index: Int) {
         val session = touchSession ?: return
-        hook.append(session, """{"k":"t","a":$action,"t":${event.eventTime},"x":${event.rawX},"y":${event.rawY}}""")
+        if (hook.activeSession(packageName, userId) != session) {
+            touchSession = null
+            return
+        }
+        // rawX/rawY are the first pointer's; the others are shifted by the same window offset.
+        val x = event.getX(index) + (event.rawX - event.getX(0))
+        val y = event.getY(index) + (event.rawY - event.getY(0))
+        hook.append(session, """{"k":"t","a":$action,"t":${event.eventTime},"x":$x,"y":$y}""")
     }
 
     private fun recordKey(event: KeyEvent) {
+        if (!RecordableKeys.isRecordable(event.keyCode)) return
         when (event.action) {
             KeyEvent.ACTION_DOWN -> {
                 if (event.repeatCount > 0) return
@@ -85,7 +110,9 @@ class RecorderWindowCallback(
                 keySessions[event.keyCode] = session
                 writeKey(session, event)
             }
-            KeyEvent.ACTION_UP -> keySessions.remove(event.keyCode)?.let { writeKey(it, event) }
+            KeyEvent.ACTION_UP -> keySessions.remove(event.keyCode)?.let {
+                if (hook.activeSession(packageName, userId) == it) writeKey(it, event)
+            }
         }
     }
 
@@ -158,4 +185,22 @@ class RecorderWindowCallback(
     private companion object {
         const val MOVE_INTERVAL_MS = 12L
     }
+}
+
+/**
+ * The only keys a macro may record: navigation and hardware keys. Letters, digits and symbols are never
+ * recorded, so text typed into a clone (passwords, messages) cannot end up in a macro or on disk.
+ */
+object RecordableKeys {
+    private val allowed = setOf(
+        KeyEvent.KEYCODE_BACK,
+        KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER,
+        KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT,
+        KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER,
+        KeyEvent.KEYCODE_TAB, KeyEvent.KEYCODE_ESCAPE,
+        KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN,
+        KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SEARCH,
+    )
+
+    fun isRecordable(keyCode: Int): Boolean = keyCode in allowed
 }

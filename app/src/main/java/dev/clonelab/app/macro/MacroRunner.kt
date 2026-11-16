@@ -22,7 +22,8 @@ import java.util.concurrent.Executors
 
 sealed interface MacroRunState {
     data object Idle : MacroRunState
-    data class Recording(val target: CloneId, val startedAt: Long) : MacroRunState
+    /** [screenSize] is the display size when the recording started: what the macro's coordinates refer to. */
+    data class Recording(val target: CloneId, val startedAt: Long, val screenSize: Pair<Int, Int>) : MacroRunState
     data class Playing(val macro: Macro, val target: CloneId, val repeatIndex: Int, val stepIndex: Int) : MacroRunState
 }
 
@@ -43,6 +44,8 @@ class MacroRunner(
     private val tapSlopPx: () -> Float,
     private val clock: () -> Long = System::currentTimeMillis,
     private val zone: () -> TimeZone = TimeZone::getDefault,
+    /** Whether a scheduled run may start now (screen on, unlocked, overlay permission); see [ScheduledStartPolicy]. */
+    private val scheduledStartAllowed: (CloneId) -> Boolean = { true },
 ) {
     private val lock = Any()
     private val _state = MutableStateFlow<MacroRunState>(MacroRunState.Idle)
@@ -54,6 +57,7 @@ class MacroRunner(
     val results: SharedFlow<PlayResult> = _results
 
     private var recordingStart: Job? = null
+    private var heartbeat: Job? = null
     private var playJob: Job? = null
 
     private val injectorThread: ExecutorService = Executors.newSingleThreadExecutor { r ->
@@ -65,21 +69,50 @@ class MacroRunner(
         scope.launch(Dispatchers.IO) { recorder.cleanStale() }
     }
 
-    /** Call when the owner goes away. */
+    /**
+     * Call when the owner goes away, after its scope was cancelled. An active recording is cancelled so
+     * its flag does not outlive the service (the heartbeat would stop anyway; this is the quick path).
+     */
     fun shutdown() {
         injectorThread.shutdownNow()
+        val recording = synchronized(lock) {
+            val was = _state.value is MacroRunState.Recording
+            if (was) _state.value = MacroRunState.Idle
+            was
+        }
+        if (recording) {
+            try {
+                recorder.cancel()
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not cancel the recording on shutdown", e)
+            }
+        }
     }
 
     fun startRecording(target: CloneId) {
         synchronized(lock) {
             if (_state.value != MacroRunState.Idle) return
-            _state.value = MacroRunState.Recording(target, clock())
-            recordingStart = scope.launch(Dispatchers.IO) {
+            _state.value = MacroRunState.Recording(target, clock(), screenSize())
+            val start = scope.launch(Dispatchers.IO) {
                 try {
                     recorder.start(target)
                 } catch (e: Exception) {
                     Log.w(TAG, "Could not start recording", e)
                     synchronized(lock) { if (_state.value is MacroRunState.Recording) _state.value = MacroRunState.Idle }
+                }
+            }
+            recordingStart = start
+            // Keeps the flag fresh: clones ignore a flag that has not been touched for ~15 s, which is
+            // what ends a recording whose main process died. Separate from `start` because stop joins that.
+            heartbeat = scope.launch(Dispatchers.IO) {
+                start.join()
+                while (true) {
+                    delay(RecordingFiles.HEARTBEAT_MS)
+                    try {
+                        recorder.heartbeat()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Recording heartbeat failed", e)
+                    }
                 }
             }
         }
@@ -90,6 +123,7 @@ class MacroRunner(
         val pending = synchronized(lock) {
             if (_state.value !is MacroRunState.Recording) return emptyList()
             _state.value = MacroRunState.Idle
+            heartbeat?.cancel()
             recordingStart
         }
         return withContext(Dispatchers.IO) {
@@ -107,6 +141,7 @@ class MacroRunner(
         val pending = synchronized(lock) {
             if (_state.value !is MacroRunState.Recording) return
             _state.value = MacroRunState.Idle
+            heartbeat?.cancel()
             recordingStart
         }
         scope.launch(Dispatchers.IO) {
@@ -118,13 +153,13 @@ class MacroRunner(
     /**
      * Brings [target] to the front if it is not there (waiting up to 8 s for it), then plays. The result
      * arrives on [results]; [state] is Playing meanwhile and Idle again afterwards.
+     * @return false when something else is going on and nothing was started.
      */
-    fun play(macro: Macro, target: CloneId) {
-        synchronized(lock) {
-            if (_state.value != MacroRunState.Idle) return
-            _state.value = MacroRunState.Playing(macro, target, 0, 0)
-            playJob = scope.launch { run(macro, target) }
-        }
+    fun play(macro: Macro, target: CloneId): Boolean = synchronized(lock) {
+        if (_state.value != MacroRunState.Idle) return false
+        _state.value = MacroRunState.Playing(macro, target, 0, 0)
+        playJob = scope.launch { run(macro, target) }
+        true
     }
 
     fun stop() {
@@ -134,7 +169,10 @@ class MacroRunner(
     private suspend fun run(macro: Macro, target: CloneId) {
         var result: PlayResult = PlayResult.Stopped
         try {
-            result = withContext(Dispatchers.IO) { ensureFocused(target) } ?: playFocused(macro, target)
+            val (width, height) = screenSize()
+            result = MacroPlayer.orientationMismatch(macro, width, height)
+                ?: withContext(Dispatchers.IO) { ensureFocused(target) }
+                ?: playFocused(macro, target)
         } catch (e: CancellationException) {
             result = PlayResult.Stopped
         } catch (e: Exception) {
@@ -190,7 +228,10 @@ class MacroRunner(
 
     /**
      * Called about every 30 s by the service. Starts the first due macro when nothing else is going on.
-     * `lastScheduledRunAt` is stored before the run starts, so a failing run cannot repeat in a loop.
+     * The Playing state is claimed first; only when the run really started is `lastScheduledRunAt` stored
+     * (through [MacroStore.markRun], which leaves an edit saved meanwhile alone), so a failing run cannot
+     * repeat in a loop and a run that could not start is not lost. While the phone is not in use (see
+     * [ScheduledStartPolicy]) nothing starts and the macro stays due for a later tick.
      */
     fun tick() {
         if (_state.value != MacroRunState.Idle) return
@@ -198,9 +239,14 @@ class MacroRunner(
         val zone = zone()
         val due = store.all().firstOrNull { MacroScheduler.due(it, now, zone) } ?: return
         val userId = due.scheduleUserId ?: return
-        val updated = due.copy(lastScheduledRunAt = now)
-        store.put(updated)
-        play(updated, CloneId(updated.packageName, userId))
+        val target = CloneId(due.packageName, userId)
+        if (!scheduledStartAllowed(target)) return
+        if (!play(due, target)) return
+        try {
+            store.markRun(due.id, now)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not store the run time of ${due.id}", e)
+        }
     }
 
     private companion object {

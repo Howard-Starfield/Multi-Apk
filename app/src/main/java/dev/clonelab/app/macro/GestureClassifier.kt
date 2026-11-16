@@ -34,7 +34,7 @@ fun parseRawLine(line: String): RawEvent? = try {
     null
 }
 
-/** Turns raw touch and key events into macro steps. */
+/** Turns raw touch and key events into macro steps. A touch sequence that ends in a cancel is dropped. */
 object GestureClassifier {
     private const val ACTION_DOWN = 0
     private const val ACTION_UP = 1
@@ -66,10 +66,14 @@ object GestureClassifier {
                         gesture = mutableListOf(Sample(e.t, e.x, e.y))
                     }
                     ACTION_MOVE -> gesture?.add(Sample(e.t, e.x, e.y))
-                    ACTION_UP, ACTION_CANCEL -> {
+                    ACTION_UP -> {
                         gesture?.add(Sample(e.t, e.x, e.y))
                         finishGesture()
                     }
+                    // The app or system took the touch away (e.g. a scroll container stole it): the
+                    // gesture never completed, so replaying it would do something else. Its time stays
+                    // in the gap before the next step, because delays run from the previous kept step.
+                    ACTION_CANCEL -> gesture = null
                 }
                 RawEvent.Kind.KEY -> when (e.action) {
                     ACTION_DOWN -> if (e.keyCode !in keyDowns) keyDowns[e.keyCode] = e.t // repeats are ignored

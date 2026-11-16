@@ -26,6 +26,7 @@ class MacroPlayerTest {
             override fun pointer(action: Int, downTime: Long, eventTime: Long, x: Float, y: Float) {
                 if (events.size >= refuseAfter) throw InjectionRefused("no")
                 events += Event("p", action, downTime, eventTime, x, y)
+                now += injectCostMs
             }
 
             override fun key(action: Int, downTime: Long, eventTime: Long, keyCode: Int) {
@@ -33,6 +34,9 @@ class MacroPlayerTest {
                 events += Event("k", action, downTime, eventTime, keyCode.toFloat(), 0f)
             }
         }
+
+        /** Virtual milliseconds each injected event takes, to model a slow injector. */
+        var injectCostMs = 0L
 
         val player = MacroPlayer(
             injector = injector,
@@ -108,10 +112,10 @@ class MacroPlayerTest {
     fun coordinatesAreScaledToTheCurrentScreen() {
         val h = Harness()
         val swipe = MacroAction.Swipe(listOf(SwipePoint(0, 100f, 100f), SwipePoint(10, 200f, 400f)))
-        h.play(macro(MacroStep(0, MacroAction.Tap(500f, 1000f, 50)), MacroStep(0, swipe)), w = 2000, h = 1000)
-        assertEquals(1000f to 500f, h.events[0].a to h.events[0].b)
-        assertEquals(200f to 50f, h.events[2].a to h.events[2].b)
-        assertEquals(400f to 200f, h.events[3].a to h.events[3].b)
+        h.play(macro(MacroStep(0, MacroAction.Tap(500f, 1000f, 50)), MacroStep(0, swipe)), w = 2000, h = 3000)
+        assertEquals(1000f to 1500f, h.events[0].a to h.events[0].b)
+        assertEquals(200f to 150f, h.events[2].a to h.events[2].b)
+        assertEquals(400f to 600f, h.events[3].a to h.events[3].b)
     }
 
     @Test
@@ -171,5 +175,62 @@ class MacroPlayerTest {
         val h = Harness()
         assertEquals(PlayResult.Completed, h.play(macro(repeat = 0)))
         assertTrue(h.events.isEmpty())
+    }
+
+    @Test
+    fun swipePointsStayOnTheirScheduleWhenInjectionIsSlow() {
+        val h = Harness().apply { injectCostMs = 30 }
+        val swipe = MacroAction.Swipe(listOf(SwipePoint(0, 0f, 0f), SwipePoint(100, 1f, 1f), SwipePoint(200, 2f, 2f), SwipePoint(300, 3f, 3f)))
+        h.play(macro(MacroStep(0, swipe)))
+        // down at 10_000; every move is stamped at its own offset, not shifted by the 30 ms spent injecting
+        val moves = h.events.filter { it.action == 2 }.map { it.time - 10_000 }
+        assertEquals(listOf(100L, 200L, 300L), moves)
+        assertTrue(h.sleeps.all { it > 0 })
+    }
+
+    @Test
+    fun aPointThatIsAlreadyLateIsNotSleptFor() {
+        val h = Harness().apply { injectCostMs = 500 }
+        val swipe = MacroAction.Swipe(listOf(SwipePoint(0, 0f, 0f), SwipePoint(100, 1f, 1f), SwipePoint(150, 2f, 2f)))
+        h.play(macro(MacroStep(0, swipe)))
+        assertTrue(h.sleeps.isEmpty())
+    }
+
+    @Test
+    fun orientationCheckComparesPortraitAndLandscape() {
+        val portrait = macro().copy(screenWidth = 1080, screenHeight = 2400)
+        assertEquals(null, MacroPlayer.orientationMismatch(portrait, 1080, 2400))
+        assertEquals(PlayResult.WrongOrientation(false), MacroPlayer.orientationMismatch(portrait, 2400, 1080))
+        val landscape = portrait.copy(screenWidth = 2400, screenHeight = 1080)
+        assertEquals(PlayResult.WrongOrientation(true), MacroPlayer.orientationMismatch(landscape, 1080, 2400))
+        assertEquals(null, MacroPlayer.orientationMismatch(landscape, 2340, 1080))
+        assertEquals(null, MacroPlayer.orientationMismatch(portrait.copy(screenWidth = 0), 2400, 1080))
+    }
+
+    @Test
+    fun wrongOrientationPlaysNothing() {
+        val h = Harness()
+        val result = h.play(macro(MacroStep(0, MacroAction.Key(1))), w = 2000, h = 1000)
+        assertEquals(PlayResult.WrongOrientation(false), result)
+        assertTrue(h.events.isEmpty())
+    }
+
+    @Test
+    fun anUnexpectedExceptionStillLiftsTheFinger() {
+        var cancelled = false
+        val injector = object : InputInjector {
+            override fun pointer(action: Int, downTime: Long, eventTime: Long, x: Float, y: Float) {
+                if (action == 3) cancelled = true
+                if (action == 1) throw IllegalStateException("boom")
+            }
+            override fun key(action: Int, downTime: Long, eventTime: Long, keyCode: Int) = Unit
+        }
+        val player = MacroPlayer(injector, clock = { 0L }, sleeper = { }, isStillFocused = { true })
+        try {
+            runBlocking { player.play(macro(MacroStep(0, MacroAction.Tap(1f, 1f, 10))), 1000, 2000) { _, _ -> } }
+        } catch (e: IllegalStateException) {
+            // expected to escape
+        }
+        assertTrue(cancelled)
     }
 }

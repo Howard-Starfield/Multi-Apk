@@ -168,6 +168,9 @@ internal class BarWindow(
 
     val isShown get() = view != null
 
+    /** Called when the window manager has dropped the window (not by [hide]); the owner must forget its views. */
+    var onLost: (() -> Unit)? = null
+
     fun show(): View? {
         view?.let { return it }
         val v = host.inflate(layout)
@@ -202,10 +205,15 @@ internal class BarWindow(
         val centerX = position.centerX ?: (screen.x / 2)
         lp.x = (centerX - w / 2).coerceIn(0, (screen.x - w).coerceAtLeast(0))
         lp.y = (position.y ?: host.dp(DEFAULT_TOP_DP)).coerceIn(0, (screen.y - h).coerceAtLeast(0))
-        if (!host.update(v, lp) && v === view) {
-            view = null
-            params = null
-        }
+        if (!host.update(v, lp) && v === view) dropWindow()
+    }
+
+    private fun dropWindow() {
+        val v = view
+        view = null
+        params = null
+        v?.animate()?.cancel()
+        onLost?.invoke()
     }
 
     private inner class DragListener : View.OnTouchListener {
@@ -237,7 +245,7 @@ internal class BarWindow(
                         lp.y = (startY + dy).toInt().coerceIn(0, (screen.y - h).coerceAtLeast(0))
                         position.centerX = lp.x + w / 2
                         position.y = lp.y
-                        host.update(v, lp)
+                        if (!host.update(v, lp) && v === view) dropWindow()
                     }
                 }
             }

@@ -39,6 +39,23 @@ class CloneLabApp : Application() {
         super.onCreate()
         BlackBoxCore.get().doCreate()
         installRecorderHook()
+        cleanStaleRecordings()
+    }
+
+    /**
+     * Main process only: a recording flag or session file left by a crash, a kill or a reboot must not
+     * outlive the process that wrote it. Off the main thread; the service also cleans when it starts.
+     */
+    private fun cleanStaleRecordings() {
+        if (!BlackBoxCore.get().isMainProcess) return
+        val recorder = ServiceLocator.macroRecorder(this)
+        Thread({
+            try {
+                recorder.cleanStale()
+            } catch (e: Exception) {
+                // best effort; the clones also ignore a flag that is not refreshed
+            }
+        }, "macro-stale-cleanup").apply { isDaemon = true }.start()
     }
 
     /**

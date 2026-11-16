@@ -30,8 +30,9 @@ class InstrumentationInjector(private val instrumentation: Instrumentation = Ins
         event.source = InputDevice.SOURCE_TOUCHSCREEN
         try {
             instrumentation.sendPointerSync(event)
-        } catch (e: SecurityException) {
-            throw InjectionRefused(e.message, e)
+        } catch (e: RuntimeException) {
+            // SecurityException, and IllegalArgumentException from Android 13+ for windows of another uid.
+            throw InjectionRefused(e.message ?: e.javaClass.simpleName, e)
         } finally {
             event.recycle()
         }
@@ -41,8 +42,8 @@ class InstrumentationInjector(private val instrumentation: Instrumentation = Ins
         val event = KeyEvent(downTime, eventTime, action, keyCode, 0)
         try {
             instrumentation.sendKeySync(event)
-        } catch (e: SecurityException) {
-            throw InjectionRefused(e.message, e)
+        } catch (e: RuntimeException) {
+            throw InjectionRefused(e.message ?: e.javaClass.simpleName, e)
         }
     }
 }

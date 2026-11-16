@@ -133,7 +133,7 @@
     <string name="macros_button">Macros</string>
     <string name="macros_need_overlay">Macros need the \'Display over other apps\' permission</string>
     <string name="macro_panel_title">Macros — %1$s</string>
-    <string name="macro_empty">No macros yet. Tap Record new, then do the taps you want repeated.</string>
+    <string name="macro_empty">No macros yet. Tap Record new, then do the taps you want repeated. Taps inside pop-up dialogs can\'t be recorded yet.</string>
     <string name="macro_record_new">Record new</string>
     <string name="macro_close">Close</string>
     <string name="macro_play">Play</string>
@@ -205,6 +205,8 @@
     <string name="error_clear_data_failed">Clearing data failed.</string>
     <string name="error_remove_failed">Removing the clone failed.</string>
     <string name="macro_could_not_run_unknown">Macro could not run</string>
+    <string name="macro_wrong_orientation_portrait">This macro was recorded in portrait. Rotate the phone and try again.</string>
+    <string name="macro_wrong_orientation_landscape">This macro was recorded in landscape. Rotate the phone and try again.</string>
     <string name="keepalive_channel_description">Shows that clones are being kept alive in the background.</string>
     <string name="keepalive_alert_channel_description">Tells you when a clone has stopped.</string>
 </resources>

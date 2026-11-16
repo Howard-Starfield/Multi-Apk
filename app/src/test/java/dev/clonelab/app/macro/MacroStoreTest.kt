@@ -1,6 +1,7 @@
 package dev.clonelab.app.macro
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -126,5 +127,32 @@ class MacroStoreTest {
         store.put(macro("a"))
         file().renameTo(File(folder.root, "macros.json.tmp"))
         assertEquals(listOf("a"), MacroStore(file()).all().map { it.id })
+    }
+
+    @Test
+    fun markRunChangesOnlyTheLastRunOfTheStoredMacro() {
+        val store = MacroStore(file())
+        store.put(full)
+        // an edit saved after the scheduler read its copy
+        store.put(full.copy(name = "Edited", repeatCount = 5))
+        assertTrue(store.markRun(full.id, 42L))
+        val m = store.get(full.id)!!
+        assertEquals("Edited", m.name)
+        assertEquals(5, m.repeatCount)
+        assertEquals(42L, m.lastScheduledRunAt)
+        assertFalse(store.markRun("missing", 1L))
+    }
+
+    @Test
+    fun saveSeesTheStoredMacroAndKeepsALaterRun() {
+        val store = MacroStore(file())
+        store.put(full.copy(lastScheduledRunAt = 100))
+        store.markRun(full.id, 900L)
+        val saved = store.save(full.id) { stored ->
+            full.copy(name = "Edited", lastScheduledRunAt = maxOf(100L, stored?.lastScheduledRunAt ?: 0L))
+        }
+        assertEquals(900L, saved.lastScheduledRunAt)
+        assertEquals(saved, store.get(full.id))
+        assertEquals(1, store.all().size)
     }
 }

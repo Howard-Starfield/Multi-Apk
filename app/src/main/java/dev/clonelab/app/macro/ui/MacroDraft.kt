@@ -63,8 +63,10 @@ data class MacroDraft(
     /**
      * The macro to store. A scheduled macro targets [scheduleUserId]; when the schedule differs from
      * [previous] (or the macro is new) the schedule clock starts at [now] so it does not fire at once.
+     * Otherwise the last run is kept: the later of [previous] (what the editor opened with) and [stored]
+     * (what is stored now), because the scheduler may have run the macro while the editor was open.
      */
-    fun toMacro(scheduleUserId: Int?, now: Long, previous: Macro?): Macro {
+    fun toMacro(scheduleUserId: Int?, now: Long, previous: Macro?, stored: Macro? = previous): Macro {
         val scheduled = schedule != MacroSchedule.Off
         val changed = schedule != (previous?.schedule ?: MacroSchedule.Off)
         return Macro(
@@ -78,7 +80,7 @@ data class MacroDraft(
             repeatDelayMs = repeatDelayMs,
             schedule = schedule,
             scheduleUserId = if (scheduled) scheduleUserId else null,
-            lastScheduledRunAt = if (changed) now else previous?.lastScheduledRunAt ?: 0,
+            lastScheduledRunAt = if (changed) now else maxOf(previous?.lastScheduledRunAt ?: 0, stored?.lastScheduledRunAt ?: 0),
             createdAt = createdAt,
         )
     }

@@ -12,7 +12,6 @@ import dev.clonelab.app.macro.MacroRunState
 import dev.clonelab.app.macro.MacroRunner
 import dev.clonelab.app.macro.PlayResult
 import dev.clonelab.app.ui.toUserMessage
-import dev.clonelab.app.macro.ScreenMetrics
 import dev.clonelab.app.model.CloneId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -329,7 +328,7 @@ class MacroOverlays(
                 id = UUID.randomUUID().toString(),
                 name = context.getString(R.string.macro_default_name, number),
                 packageName = packageName,
-                screenSize = ScreenMetrics.realSize(context),
+                screenSize = recording.screenSize, // as it was when recording started
                 steps = steps,
                 createdAt = System.currentTimeMillis(),
             )
@@ -355,10 +354,12 @@ class MacroOverlays(
             saving = true
             // A scheduled macro targets the clone that is in front when it is saved.
             val userId = focused?.userId ?: current.original?.scheduleUserId
-            val macro = draft.toMacro(userId, System.currentTimeMillis(), current.original)
+            val now = System.currentTimeMillis()
             scope.launch(Dispatchers.Main) {
                 try {
-                    withContext(Dispatchers.IO) { store.put(macro) }
+                    withContext(Dispatchers.IO) {
+                        store.save(draft.id) { stored -> draft.toMacro(userId, now, current.original, stored) }
+                    }
                     KeepAliveController.sync(context)
                     ui = Ui.None
                     render()
@@ -396,6 +397,11 @@ class MacroOverlays(
             )
             is PlayResult.LaunchFailed -> toast(
                 context.getString(R.string.macro_could_not_run, result.cause.toUserMessage(R.string.error_launch_failed).resolve(context)),
+            )
+            is PlayResult.WrongOrientation -> toast(
+                context.getString(
+                    if (result.recordedLandscape) R.string.macro_wrong_orientation_landscape else R.string.macro_wrong_orientation_portrait,
+                ),
             )
             PlayResult.Completed, PlayResult.Stopped -> Unit
         }

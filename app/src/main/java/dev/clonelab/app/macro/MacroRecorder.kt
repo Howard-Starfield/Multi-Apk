@@ -12,6 +12,7 @@ import java.util.UUID
 class MacroRecorder(baseDir: File) {
     private val files = RecordingFiles(baseDir)
     private var session: String? = null
+    private var target: CloneId? = null
 
     val isRecording: Boolean @Synchronized get() = session != null
 
@@ -23,6 +24,7 @@ class MacroRecorder(baseDir: File) {
         files.sessionFile(id).apply { parentFile?.mkdirs() }.writeText("")
         files.writeFlag(RecordingFlag(id, target.packageName, target.userId))
         session = id
+        this.target = target
         return id
     }
 
@@ -34,6 +36,7 @@ class MacroRecorder(baseDir: File) {
     fun stop(tapSlopPx: Float): List<MacroStep> {
         val id = session ?: return emptyList()
         session = null
+        target = null
         files.deleteFlag()
         val file = files.sessionFile(id)
         try {
@@ -48,7 +51,15 @@ class MacroRecorder(baseDir: File) {
     @Synchronized
     fun cancel() = discard()
 
-    /** Removes flag and session files left behind by an earlier run of the app. */
+    /** Touches the flag so clones keep treating it as live; a no-op when no session is running. */
+    @Synchronized
+    fun heartbeat() {
+        val id = session ?: return
+        val current = target ?: return
+        files.touchFlag(RecordingFlag(id, current.packageName, current.userId))
+    }
+
+    /** Removes flag and session files left behind by an earlier run of the app (or a crash or reboot). */
     @Synchronized
     fun cleanStale() {
         if (session == null) files.deleteAll()
@@ -58,6 +69,7 @@ class MacroRecorder(baseDir: File) {
         files.deleteFlag()
         session?.let { files.sessionFile(it).delete() }
         session = null
+        target = null
     }
 
     /** Waits until the file stops growing, at most [FLUSH_WAIT_MS] in total. */

@@ -1,5 +1,6 @@
 package dev.clonelab.app.macro
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -86,5 +87,28 @@ class MacroSchedulerTest {
     fun withoutATargetCloneNothingIsDue() {
         assertFalse(MacroScheduler.due(macro(MacroSchedule.EveryMinutes(1), userId = null), Long.MAX_VALUE / 2, zone))
         assertFalse(MacroScheduler.due(macro(MacroSchedule.DailyAt(0, 0), userId = null), at(12, 0), zone))
+    }
+
+    @Test
+    fun aLastRunInTheFutureFallsBackToCreationSoTheScheduleThawsAfterAClockError() {
+        // Stored while the clock was a day ahead; the macro was created long before.
+        val now = at(12, 0)
+        val m = macro(MacroSchedule.EveryMinutes(10), lastRun = now + 24 * 60 * minute, createdAt = now - 60 * minute)
+        assertTrue(MacroScheduler.due(m, now, zone))
+        assertTrue(MacroScheduler.baseline(m, now) <= now)
+    }
+
+    @Test
+    fun aBaselineIsNeverLaterThanNow() {
+        val now = at(12, 0)
+        val m = macro(MacroSchedule.EveryMinutes(10), lastRun = now + 5 * minute, createdAt = now + 10 * minute)
+        assertEquals(now, MacroScheduler.baseline(m, now))
+        assertFalse(MacroScheduler.due(m, now, zone))
+    }
+
+    @Test
+    fun dailyWithAFutureLastRunRunsOnceTodayAfterItsTime() {
+        val m = macro(MacroSchedule.DailyAt(9, 0), lastRun = at(9, 0, dayOfMonth = 20), createdAt = at(1, 0, dayOfMonth = 1))
+        assertTrue(MacroScheduler.due(m, at(10, 0), zone))
     }
 }

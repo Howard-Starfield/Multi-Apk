@@ -377,7 +377,7 @@ class SwitcherOverlay(
                     }
                 }
                 MotionEvent.ACTION_UP -> if (dragging) snap(view, lp) else toggle()
-                MotionEvent.ACTION_CANCEL -> if (dragging) snap(view, lp)
+                MotionEvent.ACTION_CANCEL -> if (dragging) snap(view, lp) else if (!collapsed) scheduleCollapse(COLLAPSE_IDLE_MS)
             }
             return true
         }

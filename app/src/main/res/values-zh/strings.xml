@@ -131,7 +131,7 @@
     <string name="macros_button">宏</string>
     <string name="macros_need_overlay">宏需要“显示在其他应用上层”（悬浮窗）权限</string>
     <string name="macro_panel_title">宏 — %1$s</string>
-    <string name="macro_empty">还没有宏。点按“新建录制”，然后执行你想重复的点击操作。</string>
+    <string name="macro_empty">还没有宏。点按“新建录制”，然后执行你想重复的点击操作。弹出对话框内的点击暂时无法录制。</string>
     <string name="macro_record_new">新建录制</string>
     <string name="macro_close">关闭</string>
     <string name="macro_play">播放</string>
@@ -203,6 +203,8 @@
     <string name="error_clear_data_failed">清除数据失败。</string>
     <string name="error_remove_failed">移除分身失败。</string>
     <string name="macro_could_not_run_unknown">宏无法运行</string>
+    <string name="macro_wrong_orientation_portrait">此宏是在竖屏下录制的。请旋转手机后重试。</string>
+    <string name="macro_wrong_orientation_landscape">此宏是在横屏下录制的。请旋转手机后重试。</string>
     <string name="keepalive_channel_description">显示分身正在后台保活。</string>
     <string name="keepalive_alert_channel_description">分身停止时通知你。</string>
 </resources>

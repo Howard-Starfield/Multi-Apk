@@ -1,5 +1,6 @@
 package dev.clonelab.app.keepalive
 
+import android.app.KeyguardManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -21,6 +22,7 @@ import dev.clonelab.app.macro.InstrumentationInjector
 import dev.clonelab.app.macro.MacroRunState
 import dev.clonelab.app.macro.MacroRunner
 import dev.clonelab.app.macro.MacroSchedule
+import dev.clonelab.app.macro.ScheduledStartPolicy
 import dev.clonelab.app.macro.ScreenMetrics
 import dev.clonelab.app.macro.ui.MacroOverlays
 import dev.clonelab.app.model.CloneId
@@ -42,6 +44,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 
@@ -54,6 +58,9 @@ class KeepAliveService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var watchdog: Job? = null
+
+    /** One watchdog pass at a time: its maps are plain HashMaps and a clone must not be restarted twice. */
+    private val tickMutex = Mutex()
     private var switcherJob: Job? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -89,6 +96,7 @@ class KeepAliveService : Service() {
             launchClone = { id -> ServiceLocator.repository(applicationContext).launch(id) },
             screenSize = { ScreenMetrics.realSize(this) },
             tapSlopPx = { ViewConfiguration.get(this).scaledTouchSlop.toFloat() },
+            scheduledStartAllowed = ::scheduledStartAllowed,
         )
         macroRunnerField = runner
         runnerRef = WeakReference(runner)
@@ -111,7 +119,7 @@ class KeepAliveService : Service() {
         watchdog = scope.launch {
             while (isActive) {
                 try {
-                    if (!tick()) break
+                    if (!tickMutex.withLock { tick() }) break
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -136,9 +144,11 @@ class KeepAliveService : Service() {
 
     override fun onDestroy() {
         runnerRef = null
+        // Scope first, so a recording start that has not run yet cannot create its flag afterwards; then
+        // the runner cancels an active recording and clears the flag.
+        scope.cancel()
         macroRunnerField?.shutdown()
         macroRunnerField = null
-        scope.cancel()
         mainHandler.removeCallbacksAndMessages(null)
         // Cancelled coroutines may still have main-thread work queued: remove the windows right here.
         macroOverlays?.destroy()
@@ -146,6 +156,25 @@ class KeepAliveService : Service() {
         overlay?.hide()
         overlay = null
         super.onDestroy()
+    }
+
+    /** Phone in use (screen on, unlocked) and a way to bring the clone up; see [ScheduledStartPolicy]. */
+    private fun scheduledStartAllowed(target: CloneId): Boolean {
+        val power = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val keyguard = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        val locked = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+            keyguard.isKeyguardLocked
+        } else {
+            @Suppress("DEPRECATION")
+            keyguard.inKeyguardRestrictedInputMode()
+        }
+        val canDraw = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)
+        return ScheduledStartPolicy.mayStart(
+            interactive = power.isInteractive,
+            keyguardLocked = locked,
+            canDrawOverlays = canDraw,
+            targetFocused = canDraw || ServiceLocator.engine().focusedClone() == target,
+        )
     }
 
     /** One watchdog pass. @return false when nothing wants the service any more. */

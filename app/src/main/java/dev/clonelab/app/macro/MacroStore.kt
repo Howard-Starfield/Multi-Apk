@@ -24,6 +24,29 @@ class MacroStore(private val file: File) {
         write(read().filterNot { it.id == macro.id } + macro)
     }
 
+    /**
+     * Stores the macro that [build] makes from what is stored right now (null when [id] is new), all
+     * under the store lock, so a concurrent [markRun] cannot be lost between the read and the write.
+     */
+    fun save(id: String, build: (stored: Macro?) -> Macro): Macro = synchronized(lock) {
+        val stored = read()
+        val macro = build(stored.firstOrNull { it.id == id })
+        write(stored.filterNot { it.id == macro.id } + macro)
+        macro
+    }
+
+    /**
+     * Records that a scheduled run started at [at]. Re-reads the stored macro and changes nothing but
+     * `lastScheduledRunAt`, so an edit saved meanwhile is kept.
+     * @return false when the macro no longer exists.
+     */
+    fun markRun(id: String, at: Long): Boolean = synchronized(lock) {
+        val stored = read()
+        val macro = stored.firstOrNull { it.id == id } ?: return false
+        write(stored.filterNot { it.id == id } + macro.copy(lastScheduledRunAt = at))
+        true
+    }
+
     fun remove(id: String) = synchronized(lock) {
         write(read().filterNot { it.id == id })
     }

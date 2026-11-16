@@ -11,6 +11,9 @@ sealed interface PlayResult {
     /** Android or the run itself refused; [detail] is the system's own text, if it gave any. */
     data class Refused(val detail: String?) : PlayResult
 
+    /** The screen is turned the other way from when the macro was recorded; [recordedLandscape] says which way that was. */
+    data class WrongOrientation(val recordedLandscape: Boolean) : PlayResult
+
     /** The target clone could not be started before the run. */
     data class LaunchFailed(val cause: Throwable) : PlayResult
 }
@@ -54,6 +57,7 @@ class MacroPlayer(
         currentHeight: Int,
         onProgress: (repeatIndex: Int, stepIndex: Int) -> Unit,
     ): PlayResult {
+        orientationMismatch(macro, currentWidth, currentHeight)?.let { return it }
         val scaleX = if (macro.screenWidth > 0) currentWidth.toFloat() / macro.screenWidth else 1f
         val scaleY = if (macro.screenHeight > 0) currentHeight.toFloat() / macro.screenHeight else 1f
         try {
@@ -71,11 +75,12 @@ class MacroPlayer(
             }
             return PlayResult.Completed
         } catch (e: CancellationException) {
-            liftFinger()
             return PlayResult.Stopped
         } catch (e: InjectionRefused) {
-            liftFinger()
             return PlayResult.Refused(e.message)
+        } finally {
+            // Whatever ended the run, never leave a finger held down in the app (no-op when none is).
+            liftFinger()
         }
     }
 
@@ -95,10 +100,11 @@ class MacroPlayer(
             is MacroAction.Swipe -> {
                 val first = action.points.first()
                 val downTime = touchDown(first.x * scaleX, first.y * scaleY)
-                var previousT = first.tMs
+                val gestureStart = downTime
                 for (point in action.points.drop(1)) {
-                    wait(point.tMs - previousT)
-                    previousT = point.tMs
+                    // Each point is due at gestureStart + its own time; sleep only what is left so the
+                    // time spent injecting does not add up over the swipe.
+                    wait(gestureStart + (point.tMs - first.tMs) - clock.uptimeMs())
                     val x = point.x * scaleX
                     val y = point.y * scaleY
                     injector.pointer(MotionEventActions.MOVE, downTime, clock.uptimeMs(), x, y)
@@ -135,7 +141,7 @@ class MacroPlayer(
         kotlinx.coroutines.withContext(NonCancellable) {
             try {
                 injector.pointer(MotionEventActions.CANCEL, touch.downTime, clock.uptimeMs(), touch.x, touch.y)
-            } catch (e: InjectionRefused) {
+            } catch (e: Exception) {
                 // nothing more can be done
             }
         }
@@ -156,5 +162,16 @@ class MacroPlayer(
 
     companion object {
         const val MIN_PRESS_MS = 40L
+
+        /**
+         * @return [PlayResult.WrongOrientation] when the screen now is turned the other way from the
+         * one the macro was recorded on (portrait is w < h), else null. Unknown sizes never mismatch.
+         */
+        fun orientationMismatch(macro: Macro, currentWidth: Int, currentHeight: Int): PlayResult.WrongOrientation? {
+            if (macro.screenWidth <= 0 || macro.screenHeight <= 0 || currentWidth <= 0 || currentHeight <= 0) return null
+            val recordedLandscape = macro.screenWidth >= macro.screenHeight
+            val currentLandscape = currentWidth >= currentHeight
+            return if (recordedLandscape != currentLandscape) PlayResult.WrongOrientation(recordedLandscape) else null
+        }
     }
 }
