@@ -371,7 +371,14 @@ public class BActivityThread extends IBActivityThread.Stub {
         if (packageInfo.providers == null) {
             packageInfo.providers = new ProviderInfo[]{};
         }
-        mProviders.addAll(Arrays.asList(packageInfo.providers));
+        // Like the real system, hand this process only the providers that belong to it. The
+        // list ends up in AppBindData.providers, and app packers (which install providers
+        // themselves after unpacking) install whatever is in it.
+        for (ProviderInfo providerInfo : packageInfo.providers) {
+            if (providerInfo.multiprocess || processName.equals(providerInfo.processName)) {
+                mProviders.add(providerInfo);
+            }
+        }
 
         Object boundApplication = BRActivityThread.get(BlackBoxCore.mainThread()).mBoundApplication();
 
@@ -904,8 +911,10 @@ public class BActivityThread extends IBActivityThread.Stub {
         try {
             for (ProviderInfo providerInfo : providers) {
                 try {
-                    if (processName.equals(providerInfo.processName) ||
-                            providerInfo.processName.equals(context.getPackageName()) || providerInfo.multiprocess) {
+                    // As on real Android: a provider lives only in its declared process unless it
+                    // is multiprocess. Installing main-process providers in every process gave
+                    // each secondary process a private, empty copy and broke provider-based IPC.
+                    if (processName.equals(providerInfo.processName) || providerInfo.multiprocess) {
                         installProvider(BlackBoxCore.mainThread(), context, providerInfo, null);
                     }
                 } catch (SecurityException se) {
@@ -1033,8 +1042,10 @@ public class BActivityThread extends IBActivityThread.Stub {
                         Slog.w(TAG, "Skipping anti-detect ContentProvider: " + providerInfo.name);
                         continue;
                     }
-                    if (processName.equals(providerInfo.processName) ||
-                            providerInfo.processName.equals(context.getPackageName()) || providerInfo.multiprocess) {
+                    // As on real Android: a provider lives only in its declared process unless it
+                    // is multiprocess. Installing main-process providers in every process gave
+                    // each secondary process a private, empty copy and broke provider-based IPC.
+                    if (processName.equals(providerInfo.processName) || providerInfo.multiprocess) {
                         installProvider(BlackBoxCore.mainThread(), context, providerInfo, null);
                     }
                 } catch (Throwable ignored) {

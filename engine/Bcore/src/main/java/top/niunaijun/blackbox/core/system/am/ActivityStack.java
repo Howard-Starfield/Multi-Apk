@@ -396,7 +396,7 @@ public class ActivityStack {
         for (TaskRecord next : mTasks.values()) {
             if (userId == next.userId) {
                 for (ActivityRecord activity : next.activities) {
-                    if (activity.component.equals(componentName)) {
+                    if (!activity.finished && activity.component.equals(componentName)) {
                         record = activity;
                         break;
                     }
@@ -445,6 +445,35 @@ public class ActivityStack {
                 }
             }
             return null;
+        }
+    }
+
+    /**
+     * Forgets every activity that lived in a process that has died. The system keeps the
+     * task (and recreates its top stub activity when the user returns), but our records for
+     * it point at a dead process: left in place, a later launch would be "delivered" to one
+     * of them and silently go nowhere.
+     */
+    public void onProcessDied(ProcessRecord processRecord) {
+        synchronized (mTasks) {
+            for (TaskRecord task : mTasks.values()) {
+                synchronized (task.activities) {
+                    for (java.util.Iterator<ActivityRecord> it = task.activities.iterator(); it.hasNext(); ) {
+                        ActivityRecord activity = it.next();
+                        if (activity.processRecord == processRecord) {
+                            activity.finished = true;
+                            it.remove();
+                        }
+                    }
+                }
+            }
+        }
+        synchronized (mLaunchingActivities) {
+            for (java.util.Iterator<ActivityRecord> it = mLaunchingActivities.iterator(); it.hasNext(); ) {
+                if (it.next().processRecord == processRecord) {
+                    it.remove();
+                }
+            }
         }
     }
 

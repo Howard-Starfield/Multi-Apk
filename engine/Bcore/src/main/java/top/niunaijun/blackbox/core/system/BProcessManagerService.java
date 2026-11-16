@@ -233,6 +233,11 @@ public class BProcessManagerService implements ISystemService {
             removeProc(record);
             BNotificationManagerService.get().deletePackageNotification(record.getPackageName(), record.userId);
         }
+        try {
+            top.niunaijun.blackbox.core.system.am.BActivityManagerService.get().onProcessDied(record);
+        } catch (Throwable t) {
+            Slog.w(TAG, "onProcessDied cleanup failed: " + t);
+        }
     }
 
     public ProcessRecord findProcessRecord(String packageName, String processName, int userId) {

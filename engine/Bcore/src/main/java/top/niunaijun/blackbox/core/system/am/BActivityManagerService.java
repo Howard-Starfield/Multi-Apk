@@ -382,6 +382,17 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
         }
     }
 
+    /** Called when a clone process has died. */
+    public void onProcessDied(ProcessRecord processRecord) {
+        UserSpace userSpace;
+        synchronized (mUserSpace) {
+            userSpace = mUserSpace.get(processRecord.userId);
+        }
+        if (userSpace != null) {
+            userSpace.mStack.onProcessDied(processRecord);
+        }
+    }
+
     private UserSpace getOrCreateSpaceLocked(int userId) {
         synchronized (mUserSpace) {
             UserSpace userSpace = mUserSpace.get(userId);
