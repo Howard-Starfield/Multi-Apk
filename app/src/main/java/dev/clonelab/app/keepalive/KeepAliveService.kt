@@ -13,9 +13,15 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
+import android.view.ViewConfiguration
 import android.widget.Toast
 import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
+import dev.clonelab.app.macro.InstrumentationInjector
+import dev.clonelab.app.macro.MacroRunState
+import dev.clonelab.app.macro.MacroRunner
+import dev.clonelab.app.macro.MacroSchedule
+import dev.clonelab.app.macro.ScreenMetrics
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.CloneRecord
 import dev.clonelab.app.switcher.FocusDebouncer
@@ -34,6 +40,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.lang.ref.WeakReference
 
 /**
  * Foreground service of the main process that keeps the app alive while any clone has keep-alive on,
@@ -56,6 +63,9 @@ class KeepAliveService : Service() {
     private val lastRestartAt = mutableMapOf<CloneId, Long>()
     private val alerted = mutableSetOf<CloneId>()
     private val seenRunning = mutableSetOf<CloneId>()
+
+    /** Strong reference for the service's lifetime; the UI sees it through [macroRunner]. */
+    private var macroRunnerField: MacroRunner? = null
     private lateinit var notifications: KeepAliveNotifications
 
     override fun onCreate() {
@@ -64,6 +74,18 @@ class KeepAliveService : Service() {
         notifications.createChannels()
         ManualStops.install(this)
         overlay = SwitcherOverlay(this, SwitcherPrefs(this), ::switchTo)
+        val runner = MacroRunner(
+            scope = scope,
+            recorder = ServiceLocator.macroRecorder(this),
+            store = ServiceLocator.macroStore(this),
+            engine = ServiceLocator.engine(),
+            injector = InstrumentationInjector(),
+            launchClone = { id -> ServiceLocator.repository(applicationContext).launch(id) },
+            screenSize = { ScreenMetrics.realSize(this) },
+            tapSlopPx = { ViewConfiguration.get(this).scaledTouchSlop.toFloat() },
+        )
+        macroRunnerField = runner
+        runnerRef = WeakReference(runner)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -103,6 +125,9 @@ class KeepAliveService : Service() {
     }
 
     override fun onDestroy() {
+        runnerRef = null
+        macroRunnerField?.shutdown()
+        macroRunnerField = null
         scope.cancel()
         mainHandler.removeCallbacksAndMessages(null)
         // Cancelled coroutines may still have main-thread work queued: remove the window right here.
@@ -115,9 +140,15 @@ class KeepAliveService : Service() {
     private suspend fun tick(): Boolean = withContext(Dispatchers.IO) {
         val all = ServiceLocator.store(applicationContext).all()
         val records = all.filter { it.keepAlive }
-        if (!KeepAliveController.shouldRun(records.size, all.size, SwitcherPrefs(this@KeepAliveService).enabled)) {
-            return@withContext false
-        }
+        val macros = ServiceLocator.macroStore(applicationContext).all()
+        val scheduled = macros.count { it.schedule != MacroSchedule.Off && it.scheduleUserId != null }
+        val runner = macroRunner
+        val macroBusy = runner != null && runner.state.value != MacroRunState.Idle
+        val wanted = KeepAliveController.shouldRun(
+            records.size, all.size, SwitcherPrefs(this@KeepAliveService).enabled, scheduled,
+        )
+        if (!wanted && !macroBusy) return@withContext false
+        runner?.tick()
         if (records.isEmpty()) return@withContext true // only the switcher needs the service
         val engine = ServiceLocator.engine()
         if (!engine.awaitReady(READY_TIMEOUT_MS)) return@withContext true
@@ -250,6 +281,12 @@ class KeepAliveService : Service() {
         private const val INTERVAL_MS = 30_000L
         private const val READY_TIMEOUT_MS = 5_000L
         private const val SWITCHER_POLL_MS = 700L
+
+        @Volatile
+        private var runnerRef: WeakReference<MacroRunner>? = null
+
+        /** The macro runner of the running service, or null when the service is not running. */
+        val macroRunner: MacroRunner? get() = runnerRef?.get()
 
         fun intent(context: Context) = Intent(context, KeepAliveService::class.java)
     }
