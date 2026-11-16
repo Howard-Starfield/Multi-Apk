@@ -19,15 +19,10 @@ class SwitcherPrefs(context: Context) {
         get() = prefs.getInt(KEY_Y, DEFAULT_Y)
         set(value) = prefs.edit().putInt(KEY_Y, value).apply()
 
-    var collapsed: Boolean
-        get() = prefs.getBoolean(KEY_COLLAPSED, false)
-        set(value) = prefs.edit().putBoolean(KEY_COLLAPSED, value).apply()
-
     private companion object {
         const val KEY_ENABLED = "enabled"
         const val KEY_EDGE = "edge"
         const val KEY_Y = "y"
-        const val KEY_COLLAPSED = "collapsed"
         const val DEFAULT_Y = 400
     }
 }

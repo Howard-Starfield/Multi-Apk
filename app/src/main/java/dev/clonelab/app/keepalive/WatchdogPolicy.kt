@@ -9,6 +9,8 @@ object WatchdogPolicy {
     /**
      * @param lastRestartAt time of the last automatic restart on the same clock as [now], or null for never
      * @param canDrawOverlays whether a background restart can start an activity (Android 10+ blocks it otherwise)
+     * @param seenRunning the watchdog has seen this clone running since the service started. A clone the
+     *   user has not opened is never launched on their behalf: launching brings it to the screen.
      * @param manuallyStopped the user stopped the clone on purpose and has not launched it since: never restart or notify
      */
     fun decide(
@@ -17,8 +19,10 @@ object WatchdogPolicy {
         running: Boolean,
         canDrawOverlays: Boolean,
         manuallyStopped: Boolean,
+        seenRunning: Boolean = true,
     ): WatchdogAction = when {
         running -> WatchdogAction.None
+        !seenRunning -> WatchdogAction.None
         manuallyStopped -> WatchdogAction.None
         !canDrawOverlays -> WatchdogAction.Notify
         lastRestartAt != null && now - lastRestartAt < MIN_RESTART_INTERVAL_MS -> WatchdogAction.None

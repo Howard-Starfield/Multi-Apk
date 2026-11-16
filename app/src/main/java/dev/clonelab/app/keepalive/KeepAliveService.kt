@@ -55,6 +55,7 @@ class KeepAliveService : Service() {
     private var latestStartId = 0
     private val lastRestartAt = mutableMapOf<CloneId, Long>()
     private val alerted = mutableSetOf<CloneId>()
+    private val seenRunning = mutableSetOf<CloneId>()
     private lateinit var notifications: KeepAliveNotifications
 
     override fun onCreate() {
@@ -128,6 +129,7 @@ class KeepAliveService : Service() {
             if (!engine.isInstalled(id)) continue
             if (engine.isRunning(id)) {
                 runningCount++
+                seenRunning.add(id)
                 alerted.remove(id)
                 notifications.cancelStopped(record)
                 continue
@@ -140,6 +142,7 @@ class KeepAliveService : Service() {
             }
             val action = WatchdogPolicy.decide(
                 now, lastRestartAt[id], running = false, canDrawOverlays = canDraw, manuallyStopped = manuallyStopped,
+                seenRunning = id in seenRunning,
             )
             when (action) {
                 WatchdogAction.None -> Unit

@@ -38,4 +38,17 @@ class WatchdogPolicyTest {
         assertEquals(WatchdogAction.None, WatchdogPolicy.decide(now, null, running = false, canDrawOverlays = false, manuallyStopped = true))
         assertEquals(WatchdogAction.None, WatchdogPolicy.decide(now, now - 10_000_000, running = false, canDrawOverlays = true, manuallyStopped = true))
     }
+
+    @Test
+    fun cloneNeverSeenRunningIsLeftAlone() {
+        val now = 1_000_000L
+        assertEquals(
+            WatchdogAction.None,
+            WatchdogPolicy.decide(now, null, running = false, canDrawOverlays = true, manuallyStopped = false, seenRunning = false),
+        )
+        assertEquals(
+            WatchdogAction.None,
+            WatchdogPolicy.decide(now, null, running = false, canDrawOverlays = false, manuallyStopped = false, seenRunning = false),
+        )
+    }
 }

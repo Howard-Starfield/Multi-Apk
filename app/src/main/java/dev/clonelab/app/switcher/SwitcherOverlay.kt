@@ -5,6 +5,8 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.ContextThemeWrapper
@@ -14,7 +16,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
-import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -36,14 +37,21 @@ class SwitcherOverlay(
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val density = context.resources.displayMetrics.density
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
-    private val adapter = SwitcherAdapter(onSelect)
+    private val handler = Handler(Looper.getMainLooper())
+    private val autoCollapse = Runnable { setCollapsed(true) }
+    private val adapter = SwitcherAdapter { id ->
+        onSelect(id)
+        scheduleCollapse(COLLAPSE_AFTER_SELECT_MS)
+    }
+
+    /** The pill always starts as the slim tab and folds back to it when left alone. */
+    private var collapsed = true
 
     private var root: View? = null
     private var pill: View? = null
     private var list: RecyclerView? = null
-    private var tab: TextView? = null
+    private var tab: View? = null
     private var params: WindowManager.LayoutParams? = null
-    private var focusedNumber = 0
 
     val isShown: Boolean get() = root != null
 
@@ -54,7 +62,6 @@ class SwitcherOverlay(
             return
         }
         if (root == null && !attach()) return
-        focusedNumber = items.firstOrNull { it.state == SwitcherState.FOCUSED }?.number ?: items.first().number
         adapter.update(items, icons)
         list?.let { rv ->
             val lp = rv.layoutParams
@@ -66,6 +73,8 @@ class SwitcherOverlay(
     }
 
     fun hide() {
+        handler.removeCallbacks(autoCollapse)
+        collapsed = true
         val view = root ?: return
         root = null
         pill = null
@@ -92,6 +101,13 @@ class SwitcherOverlay(
         rv.layoutManager = GridLayoutManager(themed, COLUMNS)
         rv.adapter = adapter
         rv.itemAnimator = null
+        // Scrolling or touching the list counts as activity and postpones the auto-collapse.
+        rv.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
+            override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                if (!collapsed) scheduleCollapse(COLLAPSE_IDLE_MS)
+                return false
+            }
+        })
         val drag = DragListener()
         view.findViewById<View>(R.id.handle).setOnTouchListener(drag)
         view.findViewById<View>(R.id.tab).setOnTouchListener(drag)
@@ -134,26 +150,39 @@ class SwitcherOverlay(
         pill = view.findViewById(R.id.pill)
         list = rv
         tab = view.findViewById(R.id.tab)
+        view.findViewById<View>(R.id.grip).background =
+            GripDotsDrawable(dotRadius = 1.5f * density, gap = 3f * density, color = GRIP_COLOR)
         params = lp
         return true
     }
 
     private fun applyCollapsed() {
-        val collapsed = prefs.collapsed
         pill?.visibility = if (collapsed) View.GONE else View.VISIBLE
         tab?.let {
             it.visibility = if (collapsed) View.VISIBLE else View.GONE
-            it.text = focusedNumber.toString()
             it.background = tabBackground(prefs.edge)
         }
     }
 
+    private fun setCollapsed(value: Boolean) {
+        handler.removeCallbacks(autoCollapse)
+        collapsed = value
+        if (root == null) return
+        applyCollapsed()
+        reposition()
+        if (!value) scheduleCollapse(COLLAPSE_IDLE_MS)
+    }
+
+    private fun scheduleCollapse(delayMs: Long) {
+        handler.removeCallbacks(autoCollapse)
+        handler.postDelayed(autoCollapse, delayMs)
+    }
+
     /** Rounded on the side that faces the screen interior. */
     private fun tabBackground(edge: Int): Drawable {
-        val r = dp(14).toFloat()
+        val r = dp(6).toFloat()
         return GradientDrawable().apply {
-            setColor(ContextCompat.getColor(themed, R.color.switcher_surface))
-            setStroke(dp(1), ContextCompat.getColor(themed, R.color.switcher_outline))
+            setColor(TAB_COLOR)
             cornerRadii = if (edge == SwitcherGeometry.EDGE_LEFT) {
                 floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f)
             } else {
@@ -214,6 +243,7 @@ class SwitcherOverlay(
                     startX = lp.x
                     startY = lp.y
                     dragging = false
+                    handler.removeCallbacks(autoCollapse)
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX - downX
@@ -242,18 +272,19 @@ class SwitcherOverlay(
             prefs.y = lp.y
             applyCollapsed() // the collapsed tab is rounded towards the interior of the screen
             reposition()
+            if (!collapsed) scheduleCollapse(COLLAPSE_IDLE_MS)
         }
 
-        private fun toggle() {
-            prefs.collapsed = !prefs.collapsed
-            applyCollapsed()
-            reposition()
-        }
+        private fun toggle() = setCollapsed(!collapsed)
     }
 
     private companion object {
         const val TAG = "SwitcherOverlay"
         const val COLUMNS = 2
         const val ROW_DP = 40
+        const val TAB_COLOR = 0x661C1B1F // slim and see-through: it sits on top of the clone
+        const val GRIP_COLOR = 0xCCFFFFFF.toInt()
+        const val COLLAPSE_IDLE_MS = 4_000L
+        const val COLLAPSE_AFTER_SELECT_MS = 400L
     }
 }
