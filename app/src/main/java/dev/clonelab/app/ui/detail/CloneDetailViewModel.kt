@@ -37,6 +37,8 @@ class CloneDetailViewModel(
     private val syncKeepAlive: () -> Unit = {},
 ) : ViewModel() {
 
+    val cloneId: CloneId get() = id
+
     /** The clone's current state, or null once it has been removed. */
     val item: StateFlow<CloneItem?> = repository.clones
         .map { items -> items.firstOrNull { it.record.id == id } }

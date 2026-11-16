@@ -86,6 +86,20 @@
             android:text="@string/detail_keep_alive_guide" />
 
         <Button
+            android:id="@+id/location"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/detail_location" />
+
+        <Button
+            android:id="@+id/deviceProfile"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/detail_device_profile" />
+
+        <Button
             android:id="@+id/stop"
             style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="match_parent"

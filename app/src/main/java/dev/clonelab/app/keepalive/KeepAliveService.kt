@@ -92,7 +92,15 @@ class KeepAliveService : Service() {
                 continue
             }
             val now = SystemClock.elapsedRealtime()
-            when (WatchdogPolicy.decide(now, lastRestartAt[id], running = false, canDrawOverlays = canDraw)) {
+            val manuallyStopped = ManualStops.contains(id)
+            if (manuallyStopped) {
+                alerted.remove(id)
+                notifications.cancelStopped(record)
+            }
+            val action = WatchdogPolicy.decide(
+                now, lastRestartAt[id], running = false, canDrawOverlays = canDraw, manuallyStopped = manuallyStopped,
+            )
+            when (action) {
                 WatchdogAction.None -> Unit
                 WatchdogAction.Restart -> {
                     lastRestartAt[id] = now

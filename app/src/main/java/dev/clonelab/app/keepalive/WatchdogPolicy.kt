@@ -9,9 +9,17 @@ object WatchdogPolicy {
     /**
      * @param lastRestartAt time of the last automatic restart on the same clock as [now], or null for never
      * @param canDrawOverlays whether a background restart can start an activity (Android 10+ blocks it otherwise)
+     * @param manuallyStopped the user stopped the clone on purpose and has not launched it since: never restart or notify
      */
-    fun decide(now: Long, lastRestartAt: Long?, running: Boolean, canDrawOverlays: Boolean): WatchdogAction = when {
+    fun decide(
+        now: Long,
+        lastRestartAt: Long?,
+        running: Boolean,
+        canDrawOverlays: Boolean,
+        manuallyStopped: Boolean,
+    ): WatchdogAction = when {
         running -> WatchdogAction.None
+        manuallyStopped -> WatchdogAction.None
         !canDrawOverlays -> WatchdogAction.Notify
         lastRestartAt != null && now - lastRestartAt < MIN_RESTART_INTERVAL_MS -> WatchdogAction.None
         else -> WatchdogAction.Restart

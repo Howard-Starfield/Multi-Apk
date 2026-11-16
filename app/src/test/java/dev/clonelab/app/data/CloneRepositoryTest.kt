@@ -1,5 +1,6 @@
 package dev.clonelab.app.data
 
+import dev.clonelab.app.keepalive.ManualStops
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.DeviceProfile
 import dev.clonelab.app.model.IconKind
@@ -73,6 +74,26 @@ class CloneRepositoryTest {
         val record = repository.addFromApk("content://apk", "My APK").getOrThrow()
         assertEquals(CloneId("com.example.fromapk", 0), record.id)
         assertEquals("My APK", record.appLabel)
+    }
+
+    @Test
+    fun stopAndClearDataMarkManualStopAndLaunchClearsIt() = runTest {
+        ManualStops.clearAll()
+        setUp()
+        val id = repository.addFromInstalledApp("com.a", "A").getOrThrow().id
+        repository.launch(id)
+        assertFalse(ManualStops.contains(id))
+
+        repository.stop(id)
+        assertTrue(ManualStops.contains(id))
+        repository.launch(id)
+        assertFalse(ManualStops.contains(id))
+
+        repository.clearData(id)
+        assertTrue(ManualStops.contains(id))
+        repository.launch(id)
+        assertFalse(ManualStops.contains(id))
+        ManualStops.clearAll()
     }
 
     @Test

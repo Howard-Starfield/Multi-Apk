@@ -19,7 +19,9 @@ import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
 import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.databinding.ActivityCloneDetailBinding
+import dev.clonelab.app.device.DeviceProfileActivity
 import dev.clonelab.app.keepalive.KeepAliveController
+import dev.clonelab.app.location.LocationActivity
 import dev.clonelab.app.keepalive.KeepAlivePrefs
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.shortcut.ShortcutPublisher
@@ -79,6 +81,8 @@ class CloneDetailActivity : AppCompatActivity() {
             }
         }
         binding.keepAliveGuide.setOnClickListener { startActivity(KeepAliveGuideActivity.intent(this)) }
+        binding.location.setOnClickListener { startActivity(LocationActivity.intent(this, viewModel.cloneId)) }
+        binding.deviceProfile.setOnClickListener { startActivity(DeviceProfileActivity.intent(this, viewModel.cloneId)) }
         binding.stop.setOnClickListener { viewModel.stop() }
         binding.clearData.setOnClickListener { confirm(R.string.detail_clear_data_confirm, viewModel::clearData) }
         binding.uninstall.setOnClickListener { confirm(R.string.detail_uninstall_confirm, viewModel::remove) }

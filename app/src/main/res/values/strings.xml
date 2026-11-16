@@ -51,6 +51,38 @@
     <string name="home_reorder">Reorder</string>
     <string name="home_reorder_done">Done</string>
 
+    <string name="detail_location">Location</string>
+    <string name="detail_device_profile">Device profile</string>
+    <string name="stop_now">Stop clone now</string>
+
+    <string name="location_title">Location</string>
+    <string name="location_enable">Use a fake location</string>
+    <string name="location_latitude">Latitude</string>
+    <string name="location_longitude">Longitude</string>
+    <string name="location_hint">Decimal degrees, for example 48.8584 and 2.2945. You can also paste a pair such as 48.8584, 2.2945 into the latitude field.</string>
+    <string name="location_note">Takes effect the next time the clone starts.</string>
+    <string name="location_saved">Location saved.</string>
+    <string name="location_error_empty">Enter a latitude and a longitude.</string>
+    <string name="location_error_number">Enter numbers in decimal degrees, for example 48.8584, 2.2945.</string>
+    <string name="location_error_latitude">Latitude must be between -90 and 90.</string>
+    <string name="location_error_longitude">Longitude must be between -180 and 180.</string>
+    <string name="location_error_origin">0, 0 cannot be used because the engine treats it as no location. Pick another point.</string>
+
+    <string name="device_title">Device profile</string>
+    <string name="device_real">Use real device</string>
+    <string name="device_identifiers">Identifiers</string>
+    <string name="device_android_id">Android ID (16 hex characters)</string>
+    <string name="device_imei">IMEI (15 digits)</string>
+    <string name="device_serial">Serial number</string>
+    <string name="device_wifi_mac">Wi-Fi MAC address</string>
+    <string name="device_randomise">Randomise identifiers</string>
+    <string name="device_note">Takes effect the next time the clone starts. Leave an identifier empty to keep the real value.</string>
+    <string name="device_saved">Device profile saved.</string>
+    <string name="device_error_android_id">Use 16 lowercase hexadecimal characters.</string>
+    <string name="device_error_imei">Use 15 digits with a valid check digit.</string>
+    <string name="device_error_serial">Use 6 to 32 letters and digits.</string>
+    <string name="device_error_wifi_mac">Use the form aa:bb:cc:dd:ee:ff with a unicast address.</string>
+
     <string name="keepalive_channel_name">Background clones</string>
     <string name="keepalive_alert_channel_name">Clone alerts</string>
     <plurals name="keepalive_running">

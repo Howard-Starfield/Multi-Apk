@@ -39,6 +39,15 @@
             android:exported="false"
             android:label="@string/guide_title" />
 
+        <activity
+            android:name=".location.LocationActivity"
+            android:exported="false"
+            android:label="@string/location_title" />
+        <activity
+            android:name=".device.DeviceProfileActivity"
+            android:exported="false"
+            android:label="@string/device_title" />
+
         <service
             android:name=".keepalive.KeepAliveService"
             android:exported="false" />

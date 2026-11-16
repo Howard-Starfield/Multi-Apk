@@ -2,6 +2,7 @@ package dev.clonelab.app.data
 
 import dev.clonelab.app.engine.CloneEngine
 import dev.clonelab.app.engine.EngineResult
+import dev.clonelab.app.keepalive.ManualStops
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.CloneRecord
 import kotlinx.coroutines.Dispatchers
@@ -53,6 +54,7 @@ class CloneRepository(
 
     suspend fun launch(id: CloneId): Result<Unit> = withContext(Dispatchers.IO) {
         val record = store.get(id) ?: return@withContext Result.failure(IllegalStateException("Unknown clone"))
+        ManualStops.remove(id)
         engine.applyLocation(id, record.location)
         engine.applyDeviceProfile(id, record.deviceProfile)
         val result = engine.launch(id)
@@ -64,11 +66,13 @@ class CloneRepository(
     }
 
     suspend fun stop(id: CloneId) = withContext(Dispatchers.IO) {
+        ManualStops.add(id)
         engine.stop(id)
         _clones.value = loadItems()
     }
 
     suspend fun clearData(id: CloneId) = withContext(Dispatchers.IO) {
+        ManualStops.add(id)
         engine.clearData(id)
         _clones.value = loadItems()
     }
