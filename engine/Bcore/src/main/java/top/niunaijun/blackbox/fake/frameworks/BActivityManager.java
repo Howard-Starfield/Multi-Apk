@@ -342,6 +342,30 @@ public class BActivityManager extends BlackManager<IBActivityManagerService> {
         }
     }
 
+    public void onActivityPaused(IBinder token) {
+        try {
+            IBActivityManagerService service = getService();
+            if (service != null) {
+                service.onActivityPaused(token);
+            }
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * The clone whose activity is currently resumed, as "userId:packageName", or null when
+     * no clone is in the foreground.
+     */
+    public String getFocusedClone() {
+        try {
+            IBActivityManagerService service = getService();
+            return service == null ? null : service.getFocusedClone();
+        } catch (RemoteException e) {
+            return null;
+        }
+    }
+
     public void onActivityResumed(IBinder token) {
         try {
             IBActivityManagerService service = getService();

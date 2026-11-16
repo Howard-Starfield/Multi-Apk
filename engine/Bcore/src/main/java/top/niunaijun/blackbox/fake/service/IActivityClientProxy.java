@@ -66,6 +66,17 @@ public class IActivityClientProxy extends ClassInvocationStub {
         }
     }
 
+    @ProxyMethod("activityPaused")
+    public static class ActivityPaused extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            if (args != null && args.length > 0 && args[0] instanceof IBinder) {
+                BActivityManager.get().onActivityPaused((IBinder) args[0]);
+            }
+            return method.invoke(who, args);
+        }
+    }
+
     @ProxyMethod("activityResumed")
     public static class ActivityResumed extends MethodHook {
         @Override

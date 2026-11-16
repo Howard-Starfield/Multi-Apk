@@ -43,6 +43,8 @@ interface IBActivityManagerService {
 
     void onActivityCreated(int taskId, IBinder token, IBinder activityRecord);
     void onActivityResumed(IBinder token);
+    void onActivityPaused(IBinder token);
+    String getFocusedClone();
     void onActivityDestroyed(IBinder token);
     void onFinishActivity(IBinder token);
 

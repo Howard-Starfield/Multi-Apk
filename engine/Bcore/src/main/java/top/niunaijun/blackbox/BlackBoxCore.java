@@ -1241,6 +1241,13 @@ public class BlackBoxCore extends ClientConfiguration {
         Main,
     }
 
+    /**
+     * The clone currently in the foreground as "userId:packageName", or null when none is.
+     */
+    public String getFocusedClone() {
+        return getBActivityManager().getFocusedClone();
+    }
+
     public boolean isBlackProcess() {
         return mProcessType == ProcessType.BAppClient;
     }

@@ -118,12 +118,41 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
         }
     }
 
+    // The clone activity that is currently resumed, if any.
+    private final Object mFocusLock = new Object();
+    private IBinder mFocusToken;
+    private ProcessRecord mFocusProcess;
+
+    @Override
+    public void onActivityPaused(IBinder token) throws RemoteException {
+        synchronized (mFocusLock) {
+            if (token != null && token.equals(mFocusToken)) {
+                mFocusToken = null;
+                mFocusProcess = null;
+            }
+        }
+    }
+
+    @Override
+    public String getFocusedClone() throws RemoteException {
+        synchronized (mFocusLock) {
+            if (mFocusProcess == null) {
+                return null;
+            }
+            return mFocusProcess.userId + ":" + mFocusProcess.getPackageName();
+        }
+    }
+
     @Override
     public void onActivityResumed(IBinder token) throws RemoteException {
         int callingPid = Binder.getCallingPid();
         ProcessRecord process = BProcessManagerService.get().findProcessByPid(callingPid);
         if (process == null) {
             return;
+        }
+        synchronized (mFocusLock) {
+            mFocusToken = token;
+            mFocusProcess = process;
         }
         UserSpace userSpace = getOrCreateSpaceLocked(process.userId);
         synchronized (userSpace.mStack) {
@@ -384,6 +413,12 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
 
     /** Called when a clone process has died. */
     public void onProcessDied(ProcessRecord processRecord) {
+        synchronized (mFocusLock) {
+            if (mFocusProcess == processRecord) {
+                mFocusToken = null;
+                mFocusProcess = null;
+            }
+        }
         UserSpace userSpace;
         synchronized (mUserSpace) {
             userSpace = mUserSpace.get(processRecord.userId);
