@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="match_parent">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp">
 
@@ -48,6 +52,27 @@
             android:text="@string/detail_launch" />
 
         <Button
+            android:id="@+id/rename"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/detail_rename" />
+
+        <Button
+            android:id="@+id/editIcon"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/detail_edit_icon" />
+
+        <Button
+            android:id="@+id/addShortcut"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/detail_add_shortcut" />
+
+        <Button
             android:id="@+id/stop"
             style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="match_parent"
@@ -77,3 +102,4 @@
         android:text="@string/detail_remove"
         android:visibility="gone" />
 </LinearLayout>
+</ScrollView>

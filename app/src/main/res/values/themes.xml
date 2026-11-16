@@ -4,4 +4,10 @@
         <item name="colorPrimary">@color/brand</item>
         <item name="colorOnPrimary">@color/white</item>
     </style>
+
+    <style name="Theme.CloneLab.Trampoline" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

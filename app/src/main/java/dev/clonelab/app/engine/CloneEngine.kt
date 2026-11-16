@@ -25,4 +25,7 @@ interface CloneEngine {
     fun uninstall(id: CloneId)
     fun applyLocation(id: CloneId, location: LocationConfig?)
     fun applyDeviceProfile(id: CloneId, profile: DeviceProfile?)
+
+    /** Path of the APK the engine installed for this clone, or null when unknown. */
+    fun apkPath(id: CloneId): String?
 }

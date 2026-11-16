@@ -28,5 +28,11 @@
             android:name=".ui.detail.CloneDetailActivity"
             android:exported="false"
             android:label="@string/detail_title" />
+        <activity
+            android:name=".shortcut.ShortcutTrampolineActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.CloneLab.Trampoline" />
     </application>
 </manifest>

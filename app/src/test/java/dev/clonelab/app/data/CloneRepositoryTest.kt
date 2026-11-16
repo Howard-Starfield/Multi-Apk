@@ -2,6 +2,7 @@ package dev.clonelab.app.data
 
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.DeviceProfile
+import dev.clonelab.app.model.IconKind
 import dev.clonelab.app.model.LocationConfig
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -118,5 +119,36 @@ class CloneRepositoryTest {
         assertTrue(store.all().isEmpty())
         assertTrue(repository.clones.value.isEmpty())
         assertFalse(icon.exists())
+    }
+
+    @Test
+    fun updatePersistsNameAndIconFields() = runTest {
+        setUp()
+        val record = repository.addFromInstalledApp("com.a", "A").getOrThrow()
+        repository.update(record.id) {
+            it.copy(customName = "Work", iconKind = IconKind.TEXT, iconColor = 0xFF8250DF.toInt())
+        }
+        repository.update(record.id) { it.copy(iconKind = IconKind.IMAGE, iconImagePath = "/icons/a.png") }
+
+        val stored = CloneStore(File(folder.root, "clones.json")).get(record.id)!!
+        assertEquals("Work", stored.customName)
+        assertEquals("Work", stored.displayName)
+        assertEquals(IconKind.IMAGE, stored.iconKind)
+        assertEquals(0xFF8250DF.toInt(), stored.iconColor)
+        assertEquals("/icons/a.png", stored.iconImagePath)
+        assertEquals(stored, repository.clones.value.single().record)
+    }
+
+    @Test
+    fun blankNameResetsToDefaultAndKeepsOrder() = runTest {
+        setUp()
+        val first = repository.addFromInstalledApp("com.a", "A").getOrThrow()
+        val second = repository.addFromInstalledApp("com.a", "A").getOrThrow()
+        repository.update(first.id) { it.copy(customName = "Work") }
+        repository.update(first.id) { it.copy(customName = null) }
+        repository.reorder(listOf(second.id, first.id))
+
+        assertEquals("A 1", store.get(first.id)!!.displayName)
+        assertEquals(listOf(second.id, first.id), repository.clones.value.map { it.record.id })
     }
 }

@@ -67,6 +67,13 @@ class BlackBoxCloneEngine : CloneEngine {
         }
     }
 
+    override fun apkPath(id: CloneId): String? = safe(null) {
+        core.getInstalledApplications(0, id.userId)
+            .firstOrNull { it.packageName == id.packageName }
+            ?.sourceDir
+            ?.takeIf { it.isNotBlank() }
+    }
+
     private fun toResult(result: InstallResult?): EngineResult = when {
         result == null -> EngineResult.Error("The engine returned no result.")
         !result.success -> EngineResult.Error(result.msg ?: "Install failed.")

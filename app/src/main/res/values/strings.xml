@@ -32,4 +32,22 @@
     <string name="cancel">Cancel</string>
     <string name="confirm">Confirm</string>
     <string name="error_not_found">This clone does not exist.</string>
+
+    <string name="detail_rename">Rename</string>
+    <string name="detail_edit_icon">Change icon</string>
+    <string name="detail_add_shortcut">Add shortcut to home screen</string>
+    <string name="rename_title">Rename clone</string>
+    <string name="rename_hint">Name (blank for default)</string>
+    <string name="save">Save</string>
+    <string name="icon_option_app">App icon</string>
+    <string name="icon_option_text">Text icon</string>
+    <string name="icon_option_image">Image from gallery</string>
+    <string name="icon_pick_color">Pick a colour</string>
+    <string name="icon_image_failed">The image could not be used.</string>
+    <string name="shortcut_pin_unsupported">Pinning is not supported by this launcher.</string>
+    <string name="shortcut_pin_failed">The launcher did not accept the shortcut.</string>
+    <string name="shortcut_disabled_message">This clone was removed.</string>
+    <string name="shortcut_engine_not_ready">The clone engine did not start.</string>
+    <string name="home_reorder">Reorder</string>
+    <string name="home_reorder_done">Done</string>
 </resources>

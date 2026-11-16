@@ -62,4 +62,7 @@ class FakeCloneEngine : CloneEngine {
     override fun applyDeviceProfile(id: CloneId, profile: DeviceProfile?) {
         calls += "applyDeviceProfile:${profile?.presetName}"
     }
+
+    val apkPaths = mutableMapOf<CloneId, String>()
+    override fun apkPath(id: CloneId): String? = apkPaths[id]
 }

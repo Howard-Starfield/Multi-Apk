@@ -56,6 +56,10 @@ class HomeViewModel(
         }
     }
 
+    fun reorder(ids: List<CloneId>) {
+        viewModelScope.launch { repository.reorder(ids) }
+    }
+
     private companion object {
         const val ENGINE_TIMEOUT_MS = 10_000L
     }

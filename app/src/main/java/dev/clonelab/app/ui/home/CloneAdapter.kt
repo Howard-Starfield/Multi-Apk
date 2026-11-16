@@ -1,28 +1,67 @@
 package dev.clonelab.app.ui.home
 
 import android.view.LayoutInflater
+import android.annotation.SuppressLint
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import dev.clonelab.app.R
 import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.databinding.ItemCloneBinding
+import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.ui.AppVisuals
 
 class CloneAdapter(
     private val onClick: (CloneItem) -> Unit,
     private val onLongClick: (CloneItem) -> Unit,
-) : ListAdapter<CloneItem, CloneAdapter.Holder>(Diff) {
+    private val onDragStart: (Holder) -> Unit = {},
+) : RecyclerView.Adapter<CloneAdapter.Holder>() {
+
+    /** While true, touching a tile starts a drag and tapping does nothing else. */
+    var reorderMode = false
+        set(value) {
+            field = value
+            notifyItemRangeChanged(0, itemCount)
+        }
+
+    /** The list as the user currently sees it, including moves not yet persisted. */
+    private var working: List<CloneItem> = emptyList()
+
+    override fun getItemCount() = working.size
+
+    /** Diffs synchronously so that adapter positions are always valid during a drag. */
+    fun submitList(list: List<CloneItem>) {
+        val old = working
+        val result = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = old.size
+            override fun getNewListSize() = list.size
+            override fun areItemsTheSame(o: Int, n: Int) = Diff.areItemsTheSame(old[o], list[n])
+            override fun areContentsTheSame(o: Int, n: Int) = Diff.areContentsTheSame(old[o], list[n])
+        })
+        working = list
+        result.dispatchUpdatesTo(this)
+    }
+
+    fun move(from: Int, to: Int) {
+        if (from !in working.indices || to !in working.indices) return
+        val moved = working.toMutableList()
+        moved.add(to, moved.removeAt(from))
+        working = moved
+        notifyItemMoved(from, to)
+    }
+
+    fun order(): List<CloneId> = working.map { it.record.id }
 
     class Holder(val binding: ItemCloneBinding) : RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
         Holder(ItemCloneBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onBindViewHolder(holder: Holder, position: Int) {
-        val item = getItem(position)
+        val item = working[position]
         val context = holder.itemView.context
         with(holder.binding) {
             icon.setImageDrawable(AppVisuals.icon(context, item.record))
@@ -33,8 +72,18 @@ class CloneAdapter(
             }
             root.alpha = if (item.installed) 1f else 0.5f
             runningDot.visibility = if (item.running) View.VISIBLE else View.GONE
-            root.setOnClickListener { onClick(item) }
-            root.setOnLongClickListener { onLongClick(item); true }
+            if (reorderMode) {
+                root.setOnClickListener(null)
+                root.setOnLongClickListener(null)
+                root.setOnTouchListener { _, event ->
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN) onDragStart(holder)
+                    false
+                }
+            } else {
+                root.setOnTouchListener(null)
+                root.setOnClickListener { onClick(item) }
+                root.setOnLongClickListener { onLongClick(item); true }
+            }
         }
     }
 
