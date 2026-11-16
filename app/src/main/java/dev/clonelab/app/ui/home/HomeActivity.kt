@@ -16,6 +16,9 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
+import dev.clonelab.app.keepalive.SetupFlow
+import dev.clonelab.app.keepalive.SetupStatusReader
+import dev.clonelab.app.switcher.SwitcherPrefs
 import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
 import dev.clonelab.app.data.CloneItem
@@ -33,6 +36,7 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var binding: ActivityHomeBinding
     private lateinit var adapter: CloneAdapter
     private lateinit var touchHelper: ItemTouchHelper
+    private lateinit var setupFlow: SetupFlow
     private val viewModel: HomeViewModel by viewModels {
         viewModelFactory {
             initializer { HomeViewModel(ServiceLocator.repository(applicationContext), ServiceLocator.engine()) }
@@ -55,7 +59,16 @@ class HomeActivity : AppCompatActivity() {
         touchHelper.attachToRecyclerView(binding.list)
         binding.fab.setOnClickListener { startActivity(Intent(this, AddCloneActivity::class.java)) }
         binding.retry.setOnClickListener { viewModel.checkEngine() }
-        KeepAliveController.sync(applicationContext)
+        setupFlow = SetupFlow(this) { remaining ->
+            val text = if (remaining == 0) {
+                getString(R.string.setup_all_set)
+            } else {
+                resources.getQuantityString(R.plurals.setup_remaining, remaining, remaining)
+            }
+            Snackbar.make(binding.root, text, Snackbar.LENGTH_LONG).show()
+            renderSetupBanner()
+        }
+        binding.setupFix.setOnClickListener { setupFlow.start() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -78,6 +91,13 @@ class HomeActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refresh()
+        renderSetupBanner()
+        // New clones default to keep-alive and the switcher needs the service: make it match the records.
+        KeepAliveController.sync(applicationContext)
+    }
+
+    private fun renderSetupBanner() {
+        binding.setupBanner.visibility = if (SetupStatusReader.read(this).complete) View.GONE else View.VISIBLE
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -89,13 +109,24 @@ class HomeActivity : AppCompatActivity() {
         menu.findItem(R.id.action_reorder).setTitle(
             if (adapter.reorderMode) R.string.home_reorder_done else R.string.home_reorder,
         )
+        menu.findItem(R.id.action_switcher).isChecked = SwitcherPrefs(this).enabled
         return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId != R.id.action_reorder) return super.onOptionsItemSelected(item)
-        adapter.reorderMode = !adapter.reorderMode
-        invalidateOptionsMenu()
+        when (item.itemId) {
+            R.id.action_reorder -> {
+                adapter.reorderMode = !adapter.reorderMode
+                invalidateOptionsMenu()
+            }
+            R.id.action_switcher -> {
+                SwitcherPrefs(this).enabled = !item.isChecked
+                invalidateOptionsMenu()
+                // The service starts or ends (and shows or hides the pill) according to the new setting.
+                KeepAliveController.sync(applicationContext)
+            }
+            else -> return super.onOptionsItemSelected(item)
+        }
         return true
     }
 

@@ -69,6 +69,8 @@ class BlackBoxCloneEngine : CloneEngine {
 
     override fun isRunning(id: CloneId): Boolean = safe(false) { core.isPackageRunning(id.packageName, id.userId) }
 
+    override fun focusedClone(): CloneId? = safe(null) { parseFocused(core.focusedClone) }
+
     override fun launch(id: CloneId): EngineResult = guarded {
         if (core.launchApk(id.packageName, id.userId)) EngineResult.Ok
         else EngineResult.Error("${id.packageName} could not be launched. It may have no launchable activity.")
@@ -104,6 +106,17 @@ class BlackBoxCloneEngine : CloneEngine {
             .firstOrNull { it.packageName == id.packageName }
             ?.sourceDir
             ?.takeIf { it.isNotBlank() }
+    }
+
+    /** "<userId>:<packageName>" -> id; anything malformed is null. */
+    private fun parseFocused(raw: String?): CloneId? {
+        if (raw.isNullOrBlank()) return null
+        val split = raw.indexOf(':')
+        if (split <= 0 || split == raw.length - 1) return null
+        val userId = raw.substring(0, split).trim().toIntOrNull() ?: return null
+        val pkg = raw.substring(split + 1).trim()
+        if (userId < 0 || pkg.isEmpty()) return null
+        return CloneId(pkg, userId)
     }
 
     private fun toResult(result: InstallResult?): EngineResult = when {

@@ -28,6 +28,16 @@ class CloneRepositoryTest {
     }
 
     @Test
+    fun newClonesAreKeptAliveByDefaultAndStoredThatWay() = runTest {
+        setUp()
+        val fromApp = repository.addFromInstalledApp("com.a", "A").getOrThrow()
+        val fromApk = repository.addFromApk("content://apk", "x").getOrThrow()
+        assertTrue(fromApp.keepAlive)
+        assertTrue(fromApk.keepAlive)
+        assertTrue(store.get(fromApp.id)!!.keepAlive)
+    }
+
+    @Test
     fun firstCloneGetsUserIdZeroAndSecondGetsOne() = runTest {
         setUp()
         val first = repository.addFromInstalledApp("com.a", "A").getOrThrow()

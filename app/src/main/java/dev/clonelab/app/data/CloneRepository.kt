@@ -160,6 +160,7 @@ class CloneRepository(
                         id = CloneId(packageName, userId),
                         appLabel = label,
                         sortOrder = nextOrder,
+                        keepAlive = true, // new clones stay alive by default; the data-class default stays false
                         createdAt = clock(),
                     )
                     try {

@@ -8,20 +8,24 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
 import android.provider.Settings
+import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.NotificationManagerCompat
+import android.widget.Toast
 import dev.clonelab.app.R
 import dev.clonelab.app.databinding.ActivityKeepaliveGuideBinding
 import dev.clonelab.app.databinding.ItemKeepaliveStepBinding
+import dev.clonelab.app.keepalive.KeepAlivePrefs
+import dev.clonelab.app.keepalive.SetupFlow
+import dev.clonelab.app.keepalive.SetupStatusReader
 import dev.clonelab.app.keepalive.VendorSettings
 
 /** Checklist of the phone settings that keep clones running in the background, with live status. */
 class KeepAliveGuideActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityKeepaliveGuideBinding
+    private lateinit var setupFlow: SetupFlow
 
     private val requestNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         // Denied for good, or the system does not show the prompt: send the user to the settings page.
@@ -39,6 +43,17 @@ class KeepAliveGuideActivity : AppCompatActivity() {
         bindStatic(binding.stepBattery, R.string.guide_battery_title, R.string.guide_battery_text)
         bindStatic(binding.stepOverlay, R.string.guide_overlay_title, R.string.guide_overlay_text)
         bindStatic(binding.stepAutoStart, R.string.guide_autostart_title, R.string.guide_autostart_text)
+
+        setupFlow = SetupFlow(this) { remaining ->
+            val text = if (remaining == 0) {
+                getString(R.string.setup_all_set)
+            } else {
+                resources.getQuantityString(R.plurals.setup_remaining, remaining, remaining)
+            }
+            Toast.makeText(this, text, Toast.LENGTH_LONG).show()
+            render()
+        }
+        binding.fixAll.setOnClickListener { setupFlow.start() }
 
         binding.stepNotifications.action.setOnClickListener { askForNotifications() }
         binding.stepBattery.action.setOnClickListener { askToIgnoreBatteryOptimisations() }
@@ -62,11 +77,14 @@ class KeepAliveGuideActivity : AppCompatActivity() {
     }
 
     private fun render() {
-        showStatus(binding.stepNotifications, NotificationManagerCompat.from(this).areNotificationsEnabled())
-        showStatus(binding.stepBattery, isIgnoringBatteryOptimisations())
-        showStatus(binding.stepOverlay, canDrawOverlays())
-        binding.stepAutoStart.status.setText(R.string.guide_status_manual)
+        val status = SetupStatusReader.read(this)
+        showStatus(binding.stepNotifications, status.notifications)
+        showStatus(binding.stepBattery, status.battery)
+        showStatus(binding.stepOverlay, status.overlay)
+        // Auto-start cannot be read: "done" only means the page was opened (or this phone has none).
+        binding.stepAutoStart.status.setText(if (status.autoStart) R.string.guide_status_done else R.string.guide_status_manual)
         binding.stepAutoStart.action.setText(R.string.guide_open_settings)
+        binding.fixAll.visibility = if (status.complete) View.GONE else View.VISIBLE
     }
 
     private fun showStatus(step: ItemKeepaliveStepBinding, done: Boolean) {
@@ -103,6 +121,7 @@ class KeepAliveGuideActivity : AppCompatActivity() {
     }
 
     private fun openAutoStartSettings() {
+        KeepAlivePrefs(this).autoStartVisited = true
         startFirst(VendorSettings.autoStartIntents(Build.MANUFACTURER) + appDetailsIntent())
     }
 
@@ -123,13 +142,6 @@ class KeepAliveGuideActivity : AppCompatActivity() {
             }
         }
     }
-
-    private fun isIgnoringBatteryOptimisations(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
-            (getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(packageName)
-
-    private fun canDrawOverlays(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)
 
     companion object {
         fun intent(context: Context) = Intent(context, KeepAliveGuideActivity::class.java)

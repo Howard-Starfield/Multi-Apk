@@ -109,4 +109,19 @@
     <string name="guide_overlay_text">Needed to restart clones automatically. Without it you get a notification to tap instead.</string>
     <string name="guide_autostart_title">Auto-start</string>
     <string name="guide_autostart_text">On some phones (Xiaomi, Huawei, Oppo, Vivo, Samsung) allow CloneLab to auto-start and run in the background.</string>
+    <string name="home_setup_banner">Background running isn\'t fully set up. Clones may be closed by the system.</string>
+    <string name="home_setup_fix">Fix now</string>
+    <string name="home_floating_switcher">Floating switcher</string>
+    <string name="setup_toast_notifications">Allow notifications for %1$s, then go back</string>
+    <string name="setup_toast_battery">Allow %1$s to ignore battery optimisation, then go back</string>
+    <string name="setup_toast_overlay">Turn on \'Display over other apps\' for %1$s, then go back</string>
+    <string name="setup_toast_autostart">Allow %1$s to auto-start and run in the background, then go back</string>
+    <string name="setup_all_set">All set</string>
+    <plurals name="setup_remaining">
+        <item quantity="one">%d item still needs attention</item>
+        <item quantity="other">%d items still need attention</item>
+    </plurals>
+    <string name="guide_fix_all">Fix all</string>
+    <string name="switcher_handle">Clone switcher handle</string>
+    <string name="switcher_launch_failed">Could not switch: %1$s</string>
 </resources>

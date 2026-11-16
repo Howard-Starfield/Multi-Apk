@@ -51,6 +51,9 @@ class FakeCloneEngine : CloneEngine {
     override fun isInstalled(id: CloneId) = available && id in installed
     override fun isRunning(id: CloneId) = available && id in running
 
+    var focused: CloneId? = null
+    override fun focusedClone(): CloneId? = focused
+
     override fun launch(id: CloneId): EngineResult {
         calls += "launch"
         running += id

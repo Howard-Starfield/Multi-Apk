@@ -14,6 +14,13 @@
             android:layout_height="wrap_content"
             android:text="@string/guide_intro" />
 
+        <Button
+            android:id="@+id/fixAll"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/guide_fix_all" />
+
         <include
             android:id="@+id/stepNotifications"
             layout="@layout/item_keepalive_step" />

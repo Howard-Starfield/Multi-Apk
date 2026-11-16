@@ -29,6 +29,9 @@ interface CloneEngine {
     fun existingUserIds(): Set<Int>
     fun isInstalled(id: CloneId): Boolean
     fun isRunning(id: CloneId): Boolean
+
+    /** The clone whose activity is resumed right now, or null when none is on screen (also briefly during transitions). */
+    fun focusedClone(): CloneId?
     fun launch(id: CloneId): EngineResult
     fun stop(id: CloneId)
     fun clearData(id: CloneId)

@@ -22,6 +22,14 @@ object KeepAliveController {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
 
+    /**
+     * Whether [KeepAliveService] has a reason to run: a clone with keep-alive, or the floating switcher
+     * being on with at least one clone. The service re-evaluates this on every start command and stops
+     * itself when it no longer holds. Pure, so the stop logic is testable.
+     */
+    fun shouldRun(keepAliveCount: Int, cloneCount: Int, switcherEnabled: Boolean): Boolean =
+        keepAliveCount > 0 || (switcherEnabled && cloneCount > 0)
+
     /** Fire and forget; [onDone] runs on a background thread once the service has been sent its intent. */
     fun sync(context: Context, onDone: () -> Unit = {}) {
         val app = context.applicationContext
