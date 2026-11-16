@@ -83,7 +83,7 @@ class HomeActivity : AppCompatActivity() {
                     }
                 }
                 launch {
-                    viewModel.messages.collect { Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show() }
+                    viewModel.messages.collect { Snackbar.make(binding.root, it.resolve(this@HomeActivity), Snackbar.LENGTH_LONG).show() }
                 }
             }
         }

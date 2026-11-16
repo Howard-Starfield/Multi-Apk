@@ -6,7 +6,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 
 /** Android refused to deliver an injected event. */
-class InjectionRefused(message: String, cause: Throwable? = null) : Exception(message, cause)
+class InjectionRefused(message: String?, cause: Throwable? = null) : Exception(message, cause)
 
 /** Where [MacroPlayer] sends its events. Times are SystemClock.uptimeMillis values. */
 interface InputInjector {
@@ -31,7 +31,7 @@ class InstrumentationInjector(private val instrumentation: Instrumentation = Ins
         try {
             instrumentation.sendPointerSync(event)
         } catch (e: SecurityException) {
-            throw InjectionRefused(e.message ?: "Input injection was refused", e)
+            throw InjectionRefused(e.message, e)
         } finally {
             event.recycle()
         }
@@ -42,7 +42,7 @@ class InstrumentationInjector(private val instrumentation: Instrumentation = Ins
         try {
             instrumentation.sendKeySync(event)
         } catch (e: SecurityException) {
-            throw InjectionRefused(e.message ?: "Input injection was refused", e)
+            throw InjectionRefused(e.message, e)
         }
     }
 }

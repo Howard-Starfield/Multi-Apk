@@ -116,7 +116,7 @@ class DeviceProfileActivity : AppCompatActivity() {
 
     private fun onEvent(event: DeviceEvent) {
         when (event) {
-            is DeviceEvent.Failed -> Snackbar.make(binding.root, event.message, Snackbar.LENGTH_LONG).show()
+            is DeviceEvent.Failed -> Snackbar.make(binding.root, event.message.resolve(this), Snackbar.LENGTH_LONG).show()
             DeviceEvent.Saved -> Snackbar.make(binding.root, R.string.device_saved, Snackbar.LENGTH_SHORT).show()
             is DeviceEvent.Invalid -> event.fields.forEach {
                 when (it) {

@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
  * (normally the screen's error message) instead of the uncaught-exception handler.
  */
 fun ViewModel.launchGuarded(
-    onError: suspend (String) -> Unit,
+    onError: suspend (UserMessage) -> Unit,
     block: suspend CoroutineScope.() -> Unit,
 ): Job = viewModelScope.launch {
     try {
@@ -20,6 +20,6 @@ fun ViewModel.launchGuarded(
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        onError(e.message ?: e.javaClass.simpleName)
+        onError(e.toUserMessage())
     }
 }

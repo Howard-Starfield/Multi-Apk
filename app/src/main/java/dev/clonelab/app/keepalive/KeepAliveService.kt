@@ -32,6 +32,7 @@ import dev.clonelab.app.switcher.SwitcherState
 import dev.clonelab.app.switcher.SwitcherOverlay
 import dev.clonelab.app.switcher.SwitcherPrefs
 import dev.clonelab.app.ui.AppVisuals
+import dev.clonelab.app.ui.toUserMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +98,7 @@ class KeepAliveService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         latestStartId = startId
+        notifications.createChannels() // re-applies the channel names, which follow the system language
         try {
             startForeground(KeepAliveNotifications.SERVICE_ID, notifications.service(0))
         } catch (e: Exception) {
@@ -203,7 +205,7 @@ class KeepAliveService : Service() {
         scope.launch(Dispatchers.IO) {
             val repository = ServiceLocator.repository(applicationContext)
             repository.launch(id).onFailure {
-                val message = getString(R.string.switcher_launch_failed, it.message ?: "")
+                val message = getString(R.string.switcher_launch_failed, it.toUserMessage(R.string.error_launch_failed).resolve(this@KeepAliveService))
                 withContext(Dispatchers.Main) { Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show() }
             }
         }

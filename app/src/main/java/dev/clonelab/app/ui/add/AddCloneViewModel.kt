@@ -4,7 +4,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.clonelab.app.R
 import dev.clonelab.app.data.CloneRepository
+import dev.clonelab.app.ui.UserMessage
+import dev.clonelab.app.ui.toUserMessage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -24,7 +27,7 @@ data class AddState(val apps: List<InstalledApp> = emptyList(), val installing: 
 
 sealed interface AddEvent {
     data object Done : AddEvent
-    data class Failed(val message: String) : AddEvent
+    data class Failed(val message: UserMessage) : AddEvent
 }
 
 class AddCloneViewModel(
@@ -71,7 +74,7 @@ class AddCloneViewModel(
             events.send(
                 result.fold(
                     onSuccess = { AddEvent.Done },
-                    onFailure = { AddEvent.Failed(it.message ?: "Install failed.") },
+                    onFailure = { AddEvent.Failed(it.toUserMessage(R.string.error_install_failed)) },
                 ),
             )
         }

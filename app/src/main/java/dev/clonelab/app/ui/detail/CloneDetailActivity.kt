@@ -100,7 +100,7 @@ class CloneDetailActivity : AppCompatActivity() {
                     viewModel.messages.collect { event ->
                         when (event) {
                             DetailEvent.Closed -> finish()
-                            is DetailEvent.Error -> showMessage(event.message)
+                            is DetailEvent.Error -> showMessage(event.message.resolve(this@CloneDetailActivity))
                             DetailEvent.ImageFailed -> showMessage(getString(R.string.icon_image_failed))
                             DetailEvent.PinUnsupported -> showMessage(getString(R.string.shortcut_pin_unsupported))
                             DetailEvent.PinFailed -> showMessage(getString(R.string.shortcut_pin_failed))

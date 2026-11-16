@@ -20,15 +20,18 @@ class KeepAliveNotifications(context: Context) {
     private val context = context.applicationContext
     private val manager = NotificationManagerCompat.from(this.context)
 
+    /** Safe to call on every service start: re-creating a channel with the same id only updates its text, so it follows the language. */
     fun createChannels() {
         manager.createNotificationChannel(
             NotificationChannelCompat.Builder(CHANNEL_SERVICE, NotificationManagerCompat.IMPORTANCE_LOW)
                 .setName(context.getString(R.string.keepalive_channel_name))
+                .setDescription(context.getString(R.string.keepalive_channel_description))
                 .build(),
         )
         manager.createNotificationChannel(
             NotificationChannelCompat.Builder(CHANNEL_ALERT, NotificationManagerCompat.IMPORTANCE_DEFAULT)
                 .setName(context.getString(R.string.keepalive_alert_channel_name))
+                .setDescription(context.getString(R.string.keepalive_alert_channel_description))
                 .build(),
         )
     }

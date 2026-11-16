@@ -14,11 +14,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CoroutineScope
+import dev.clonelab.app.ui.UserMessage
 import dev.clonelab.app.ui.launchGuarded
 
 sealed interface LocationEvent {
     data object Saved : LocationEvent
-    data class Failed(val message: String) : LocationEvent
+    data class Failed(val message: UserMessage) : LocationEvent
     data class Invalid(val problem: CoordinateProblem) : LocationEvent
 }
 

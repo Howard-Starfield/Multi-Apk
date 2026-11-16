@@ -8,7 +8,11 @@ sealed interface PlayResult {
     data object Completed : PlayResult
     data object Stopped : PlayResult
     data object FocusLost : PlayResult
-    data class Refused(val message: String) : PlayResult
+    /** Android or the run itself refused; [detail] is the system's own text, if it gave any. */
+    data class Refused(val detail: String?) : PlayResult
+
+    /** The target clone could not be started before the run. */
+    data class LaunchFailed(val cause: Throwable) : PlayResult
 }
 
 /** Source of event times (SystemClock.uptimeMillis in production). */
@@ -71,7 +75,7 @@ class MacroPlayer(
             return PlayResult.Stopped
         } catch (e: InjectionRefused) {
             liftFinger()
-            return PlayResult.Refused(e.message ?: "Input injection was refused")
+            return PlayResult.Refused(e.message)
         }
     }
 

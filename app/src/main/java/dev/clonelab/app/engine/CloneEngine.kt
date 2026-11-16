@@ -1,12 +1,13 @@
 package dev.clonelab.app.engine
 
+import dev.clonelab.app.model.CloneError
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.DeviceProfile
 import dev.clonelab.app.model.LocationConfig
 
 sealed interface EngineResult {
     data object Ok : EngineResult
-    data class Error(val message: String) : EngineResult
+    data class Error(val error: CloneError) : EngineResult
 }
 
 /** The only view of the virtualization engine the rest of the app has. Calls block. */

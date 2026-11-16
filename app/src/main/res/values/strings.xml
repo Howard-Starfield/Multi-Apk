@@ -189,4 +189,22 @@
     <string name="macro_save">Save</string>
     <string name="macro_test_run">Test run</string>
     <string name="macro_discard">Discard</string>
+    <!-- Errors produced below the UI layer: typed in code, mapped to these strings at the UI boundary -->
+    <string name="error_generic">Something went wrong.</string>
+    <string name="error_with_detail">Something went wrong: %1$s</string>
+    <string name="error_engine_not_running">The clone engine is not running. Wait for it to start, then retry.</string>
+    <string name="error_engine_no_result">The clone engine returned no result.</string>
+    <string name="error_uninstall_failed">The clone could not be uninstalled.</string>
+    <string name="error_no_package_name">The clone engine did not report a package name.</string>
+    <string name="error_save_failed">Could not save the clone.</string>
+    <string name="error_save_failed_detail">Could not save the clone: %1$s</string>
+    <string name="error_not_launchable">%1$s could not be launched. It may have no launchable activity.</string>
+    <string name="error_install_failed">Install failed.</string>
+    <string name="error_install_failed_reason">Install failed: %1$s</string>
+    <string name="error_launch_failed">Launch failed.</string>
+    <string name="error_clear_data_failed">Clearing data failed.</string>
+    <string name="error_remove_failed">Removing the clone failed.</string>
+    <string name="macro_could_not_run_unknown">Macro could not run</string>
+    <string name="keepalive_channel_description">Shows that clones are being kept alive in the background.</string>
+    <string name="keepalive_alert_channel_description">Tells you when a clone has stopped.</string>
 </resources>

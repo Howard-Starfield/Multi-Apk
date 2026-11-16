@@ -20,10 +20,13 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
+import dev.clonelab.app.R
+import dev.clonelab.app.ui.UserMessage
 import dev.clonelab.app.ui.launchGuarded
+import dev.clonelab.app.ui.toUserMessage
 
 sealed interface DetailEvent {
-    data class Error(val message: String) : DetailEvent
+    data class Error(val message: UserMessage) : DetailEvent
     data object Closed : DetailEvent
     data object ImageFailed : DetailEvent
     data object PinUnsupported : DetailEvent
@@ -55,7 +58,7 @@ class CloneDetailViewModel(
 
     fun launch() {
         guarded {
-            repository.launch(id).onFailure { events.send(DetailEvent.Error(it.message ?: "Launch failed.")) }
+            repository.launch(id).onFailure { events.send(DetailEvent.Error(it.toUserMessage(R.string.error_launch_failed))) }
         }
     }
 
@@ -65,7 +68,7 @@ class CloneDetailViewModel(
 
     fun clearData() {
         guarded {
-            repository.clearData(id).onFailure { events.send(DetailEvent.Error(it.message ?: "Clear data failed.")) }
+            repository.clearData(id).onFailure { events.send(DetailEvent.Error(it.toUserMessage(R.string.error_clear_data_failed))) }
         }
     }
 
@@ -78,7 +81,7 @@ class CloneDetailViewModel(
                     syncKeepAlive()
                     events.send(DetailEvent.Closed)
                 },
-                onFailure = { events.send(DetailEvent.Error(it.message ?: "Remove failed.")) },
+                onFailure = { events.send(DetailEvent.Error(it.toUserMessage(R.string.error_remove_failed))) },
             )
         }
     }

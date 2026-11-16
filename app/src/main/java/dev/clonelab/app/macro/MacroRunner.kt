@@ -164,7 +164,7 @@ class MacroRunner(
             delay(SETTLE_BEFORE_FIRST_STEP_MS)
             return null
         }
-        launchClone(target).onFailure { return PlayResult.Refused(it.message ?: "The app could not be launched") }
+        launchClone(target).onFailure { return PlayResult.LaunchFailed(it) }
         val deadline = System.nanoTime() + FOCUS_WAIT_MS * 1_000_000
         while (System.nanoTime() < deadline) {
             if (engine.focusedClone() == target) {

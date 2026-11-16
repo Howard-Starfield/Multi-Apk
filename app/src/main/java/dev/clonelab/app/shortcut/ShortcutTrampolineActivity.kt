@@ -9,6 +9,7 @@ import androidx.lifecycle.lifecycleScope
 import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
 import dev.clonelab.app.model.CloneId
+import dev.clonelab.app.ui.toUserMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,7 +29,8 @@ class ShortcutTrampolineActivity : ComponentActivity() {
             val engine = ServiceLocator.engine()
             val ready = withContext(Dispatchers.IO) { engine.awaitReady(READY_TIMEOUT_MS) }
             val failure = if (ready) {
-                ServiceLocator.repository(applicationContext).launch(id).exceptionOrNull()?.message
+                ServiceLocator.repository(applicationContext).launch(id).exceptionOrNull()
+                    ?.toUserMessage(R.string.error_launch_failed)?.resolve(this@ShortcutTrampolineActivity)
                     ?: return@launch finish()
             } else {
                 getString(R.string.shortcut_engine_not_ready)

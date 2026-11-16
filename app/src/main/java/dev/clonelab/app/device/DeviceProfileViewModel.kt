@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.CoroutineScope
+import dev.clonelab.app.ui.UserMessage
 import dev.clonelab.app.ui.launchGuarded
 import java.security.SecureRandom
 import kotlin.random.Random
@@ -33,7 +34,7 @@ enum class IdentifierField { ANDROID_ID, IMEI, SERIAL, WIFI_MAC }
 
 sealed interface DeviceEvent {
     data object Saved : DeviceEvent
-    data class Failed(val message: String) : DeviceEvent
+    data class Failed(val message: UserMessage) : DeviceEvent
     data class Invalid(val fields: Set<IdentifierField>) : DeviceEvent
 }
 

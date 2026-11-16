@@ -1,6 +1,8 @@
 package dev.clonelab.app.data
 
 import dev.clonelab.app.keepalive.ManualStops
+import dev.clonelab.app.model.CloneError
+import dev.clonelab.app.model.CloneException
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.DeviceProfile
 import dev.clonelab.app.model.IconKind
@@ -74,7 +76,7 @@ class CloneRepositoryTest {
         engine.installError = "unsupported ABI"
         val result = repository.addFromInstalledApp("com.a", "A")
         assertTrue(result.isFailure)
-        assertEquals("unsupported ABI", result.exceptionOrNull()?.message)
+        assertEquals(CloneError.InstallFailed("unsupported ABI"), (result.exceptionOrNull() as CloneException).error)
         assertTrue(store.all().isEmpty())
     }
 
@@ -220,7 +222,7 @@ class CloneRepositoryTest {
     fun addFailsWhileEngineUnavailable() = runTest {
         setUp()
         engine.available = false
-        assertTrue(repository.addFromInstalledApp("com.a", "A").isFailure)
+        assertEquals(CloneError.EngineNotRunning, (repository.addFromInstalledApp("com.a", "A").exceptionOrNull() as CloneException).error)
         assertTrue(repository.addFromApk("content://apk", "x").isFailure)
         assertTrue(store.all().isEmpty())
         assertTrue(engine.installed.isEmpty())

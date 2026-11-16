@@ -91,7 +91,7 @@ class LocationActivity : AppCompatActivity() {
 
     private fun onEvent(event: LocationEvent) {
         when (event) {
-            is LocationEvent.Failed -> Snackbar.make(binding.root, event.message, Snackbar.LENGTH_LONG).show()
+            is LocationEvent.Failed -> Snackbar.make(binding.root, event.message.resolve(this), Snackbar.LENGTH_LONG).show()
             LocationEvent.Saved -> Snackbar.make(binding.root, R.string.location_saved, Snackbar.LENGTH_SHORT).show()
             is LocationEvent.Invalid -> {
                 val (layout, message) = when (event.problem) {

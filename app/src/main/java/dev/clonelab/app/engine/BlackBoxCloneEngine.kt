@@ -2,6 +2,8 @@ package dev.clonelab.app.engine
 
 import android.net.Uri
 import android.os.SystemClock
+import dev.clonelab.app.model.CloneError
+import dev.clonelab.app.model.CloneException
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.DeviceProfile
 import dev.clonelab.app.model.LocationConfig
@@ -19,7 +21,6 @@ class BlackBoxCloneEngine : CloneEngine {
 
     private companion object {
         const val POLL_MS = 200L
-        const val UNAVAILABLE = "The clone engine is not running."
     }
 
     override fun isAvailable(): Boolean = safe(false) { core.isEngineAlive() }
@@ -51,17 +52,17 @@ class BlackBoxCloneEngine : CloneEngine {
         }
 
     override fun usedUserIds(packageName: String): Set<Int> {
-        check(isAvailable()) { UNAVAILABLE }
+        if (!isAvailable()) throw CloneException(CloneError.EngineNotRunning)
         val used = core.users.map { it.id }.filter { core.isInstalled(packageName, it) }.toSet()
         // An engine that died mid-query reads as "nothing installed"; never report that as a result.
-        check(isAvailable()) { UNAVAILABLE }
+        if (!isAvailable()) throw CloneException(CloneError.EngineNotRunning)
         return used
     }
 
     override fun existingUserIds(): Set<Int> {
-        check(isAvailable()) { UNAVAILABLE }
+        if (!isAvailable()) throw CloneException(CloneError.EngineNotRunning)
         val ids = core.users.map { it.id }.toSet()
-        check(isAvailable()) { UNAVAILABLE }
+        if (!isAvailable()) throw CloneException(CloneError.EngineNotRunning)
         return ids
     }
 
@@ -73,7 +74,7 @@ class BlackBoxCloneEngine : CloneEngine {
 
     override fun launch(id: CloneId): EngineResult = guarded {
         if (core.launchApk(id.packageName, id.userId)) EngineResult.Ok
-        else EngineResult.Error("${id.packageName} could not be launched. It may have no launchable activity.")
+        else EngineResult.Error(CloneError.NotLaunchable(id.packageName))
     }
 
     override fun stop(id: CloneId) = safe(Unit) { core.stopPackage(id.packageName, id.userId) }
@@ -120,9 +121,9 @@ class BlackBoxCloneEngine : CloneEngine {
     }
 
     private fun toResult(result: InstallResult?): EngineResult = when {
-        result == null -> EngineResult.Error("The engine returned no result.")
-        !result.success -> EngineResult.Error(result.msg ?: "Install failed.")
-        result.packageName.isNullOrBlank() -> EngineResult.Error("The engine did not report a package name.")
+        result == null -> EngineResult.Error(CloneError.NoResult)
+        !result.success -> EngineResult.Error(CloneError.InstallFailed(result.msg))
+        result.packageName.isNullOrBlank() -> EngineResult.Error(CloneError.NoPackageName)
         else -> EngineResult.Ok
     }
 
@@ -145,7 +146,7 @@ class BlackBoxCloneEngine : CloneEngine {
         try {
             block()
         } catch (t: Throwable) {
-            EngineResult.Error(t.message ?: t.javaClass.simpleName)
+            EngineResult.Error(CloneError.Engine(t.message ?: t.javaClass.simpleName))
         }
 
     private inline fun <T> safe(default: T, block: () -> T): T =

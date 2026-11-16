@@ -6,7 +6,10 @@ import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.data.CloneRepository
 import dev.clonelab.app.engine.CloneEngine
 import dev.clonelab.app.model.CloneId
+import dev.clonelab.app.R
+import dev.clonelab.app.ui.UserMessage
 import dev.clonelab.app.ui.launchGuarded
+import dev.clonelab.app.ui.toUserMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -26,7 +29,7 @@ class HomeViewModel(
 ) : ViewModel() {
 
     private val engineReady = MutableStateFlow<Boolean?>(null)
-    private val errors = Channel<String>(Channel.BUFFERED)
+    private val errors = Channel<UserMessage>(Channel.BUFFERED)
 
     val state: StateFlow<HomeState> = combine(
         repository.clones, engineReady, repository.engineAvailable,
@@ -35,7 +38,7 @@ class HomeViewModel(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeState())
 
     /** One-shot error messages for the UI to show. */
-    val messages: Flow<String> = errors.receiveAsFlow()
+    val messages: Flow<UserMessage> = errors.receiveAsFlow()
 
     init {
         checkEngine()
@@ -54,7 +57,7 @@ class HomeViewModel(
 
     fun launch(id: CloneId) {
         launchGuarded(::report) {
-            repository.launch(id).onFailure { errors.send(it.message ?: "Launch failed.") }
+            repository.launch(id).onFailure { errors.send(it.toUserMessage(R.string.error_launch_failed)) }
         }
     }
 
@@ -62,7 +65,7 @@ class HomeViewModel(
         launchGuarded(::report) { repository.reorder(ids) }
     }
 
-    private suspend fun report(message: String) {
+    private suspend fun report(message: UserMessage) {
         errors.send(message)
     }
 

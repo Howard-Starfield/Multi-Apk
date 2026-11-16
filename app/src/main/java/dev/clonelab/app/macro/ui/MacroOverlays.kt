@@ -11,6 +11,7 @@ import dev.clonelab.app.macro.Macro
 import dev.clonelab.app.macro.MacroRunState
 import dev.clonelab.app.macro.MacroRunner
 import dev.clonelab.app.macro.PlayResult
+import dev.clonelab.app.ui.toUserMessage
 import dev.clonelab.app.macro.ScreenMetrics
 import dev.clonelab.app.model.CloneId
 import kotlinx.coroutines.CoroutineScope
@@ -389,7 +390,13 @@ class MacroOverlays(
     private fun onResult(result: PlayResult) {
         when (result) {
             PlayResult.FocusLost -> toast(context.getString(R.string.macro_stopped_focus_lost))
-            is PlayResult.Refused -> toast(context.getString(R.string.macro_could_not_run, result.message))
+            is PlayResult.Refused -> toast(
+                result.detail?.let { context.getString(R.string.macro_could_not_run, it) }
+                    ?: context.getString(R.string.macro_could_not_run_unknown),
+            )
+            is PlayResult.LaunchFailed -> toast(
+                context.getString(R.string.macro_could_not_run, result.cause.toUserMessage(R.string.error_launch_failed).resolve(context)),
+            )
             PlayResult.Completed, PlayResult.Stopped -> Unit
         }
         testReturn?.let {

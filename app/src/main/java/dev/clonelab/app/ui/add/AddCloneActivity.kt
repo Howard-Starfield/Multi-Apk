@@ -62,7 +62,7 @@ class AddCloneActivity : AppCompatActivity() {
                     viewModel.results.collect { event ->
                         when (event) {
                             AddEvent.Done -> finish()
-                            is AddEvent.Failed -> Snackbar.make(binding.root, event.message, Snackbar.LENGTH_LONG).show()
+                            is AddEvent.Failed -> Snackbar.make(binding.root, event.message.resolve(this@AddCloneActivity), Snackbar.LENGTH_LONG).show()
                         }
                     }
                 }

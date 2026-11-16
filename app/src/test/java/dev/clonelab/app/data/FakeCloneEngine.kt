@@ -2,6 +2,7 @@ package dev.clonelab.app.data
 
 import dev.clonelab.app.engine.CloneEngine
 import dev.clonelab.app.engine.EngineResult
+import dev.clonelab.app.model.CloneError
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.DeviceProfile
 import dev.clonelab.app.model.LocationConfig
@@ -21,13 +22,13 @@ class FakeCloneEngine : CloneEngine {
     override fun isAvailable() = available
 
     override fun installFromInstalledApp(packageName: String, userId: Int): EngineResult {
-        installError?.let { return EngineResult.Error(it) }
+        installError?.let { return EngineResult.Error(CloneError.InstallFailed(it)) }
         installed += CloneId(packageName, userId)
         return EngineResult.Ok
     }
 
     override fun installFromApk(apkUri: String, userId: Int, onPackage: (String) -> Unit): EngineResult {
-        installError?.let { return EngineResult.Error(it) }
+        installError?.let { return EngineResult.Error(CloneError.InstallFailed(it)) }
         installed += CloneId(apkPackage, userId)
         onPackage(apkPackage)
         return EngineResult.Ok

@@ -3,6 +3,8 @@ package dev.clonelab.app.data
 import dev.clonelab.app.engine.CloneEngine
 import dev.clonelab.app.engine.EngineResult
 import dev.clonelab.app.keepalive.ManualStops
+import dev.clonelab.app.model.CloneError
+import dev.clonelab.app.model.CloneException
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.CloneRecord
 import kotlinx.coroutines.Dispatchers
@@ -14,8 +16,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Raised for changes that must not run while the engine server is unreachable. */
-class EngineUnavailableException :
-    IllegalStateException("The clone engine is not running. Wait for it to start, then retry.")
+class EngineUnavailableException : CloneException(CloneError.EngineNotRunning)
 
 data class CloneItem(val record: CloneRecord, val installed: Boolean, val running: Boolean)
 
@@ -78,7 +79,7 @@ class CloneRepository(
         }
 
     suspend fun launch(id: CloneId): Result<Unit> = withContext(Dispatchers.IO) {
-        val record = store.get(id) ?: return@withContext Result.failure(IllegalStateException("Unknown clone"))
+        val record = store.get(id) ?: return@withContext Result.failure(CloneException(CloneError.UnknownClone))
         ManualStops.remove(id)
         engine.applyLocation(id, record.location)
         engine.applyDeviceProfile(id, record.deviceProfile)
@@ -86,7 +87,7 @@ class CloneRepository(
         _clones.value = loadItems()
         when (result) {
             EngineResult.Ok -> Result.success(Unit)
-            is EngineResult.Error -> Result.failure(IllegalStateException(result.message))
+            is EngineResult.Error -> Result.failure(CloneException(result.error))
         }
     }
 
@@ -118,7 +119,7 @@ class CloneRepository(
                     engine.uninstall(id)
                     requireEngine()
                     if (engine.isInstalled(id)) {
-                        return@attempt Result.failure(IllegalStateException("The clone could not be uninstalled."))
+                        return@attempt Result.failure(CloneException(CloneError.UninstallFailed))
                     }
                 } else {
                     // "Not installed" is only trustworthy if the engine was still reachable for that answer.
@@ -150,10 +151,10 @@ class CloneRepository(
 
     private fun finishAdd(result: EngineResult, packageName: String?, userId: Int, label: String): Result<CloneRecord> {
         return when (result) {
-            is EngineResult.Error -> Result.failure(IllegalStateException(result.message))
+            is EngineResult.Error -> Result.failure(CloneException(result.error))
             EngineResult.Ok -> {
                 if (packageName == null) {
-                    Result.failure(IllegalStateException("The engine did not report a package name."))
+                    Result.failure(CloneException(CloneError.NoPackageName))
                 } else {
                     val nextOrder = (store.all().maxOfOrNull { it.sortOrder } ?: -1) + 1
                     val record = CloneRecord(
@@ -168,7 +169,7 @@ class CloneRepository(
                     } catch (e: Exception) {
                         // Do not leave an engine clone that no record points to.
                         runCatching { engine.uninstall(record.id) }
-                        return Result.failure(IllegalStateException("Could not save the clone: ${e.message}", e))
+                        return Result.failure(CloneException(CloneError.SaveFailed(e.message), e))
                     }
                     _clones.value = loadItems()
                     Result.success(record)
