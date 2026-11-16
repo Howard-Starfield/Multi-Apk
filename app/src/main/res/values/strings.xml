@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CloneLab</string>
+
+    <string name="home_empty">No clones yet. Tap "Add clone" to make your first one.</string>
+    <string name="home_add_clone">Add clone</string>
+    <string name="home_engine_failed">The clone engine did not start.</string>
+    <string name="home_retry">Retry</string>
+    <string name="home_broken_label">%1$s (broken)</string>
+
+    <string name="add_clone_title">Add clone</string>
+    <string name="add_search_hint">Search apps</string>
+    <string name="add_from_apk">From APK file</string>
+    <string name="add_installing">Installing clone…</string>
+    <string name="add_no_apps">No apps match.</string>
+    <string name="add_apk_default_label">APK app</string>
+
+    <string name="detail_title">Clone</string>
+    <string name="detail_package">Package: %1$s</string>
+    <string name="detail_number">Clone number: %1$d</string>
+    <string name="detail_state_running">State: running</string>
+    <string name="detail_state_stopped">State: stopped</string>
+    <string name="detail_state_broken">State: broken. The clone no longer exists in the engine.</string>
+    <string name="detail_launch">Launch</string>
+    <string name="detail_stop">Stop</string>
+    <string name="detail_clear_data">Clear data</string>
+    <string name="detail_uninstall">Uninstall</string>
+    <string name="detail_remove">Remove</string>
+    <string name="detail_clear_data_confirm">Delete all data of this clone? This cannot be undone.</string>
+    <string name="detail_uninstall_confirm">Uninstall this clone and delete its data? This cannot be undone.</string>
+    <string name="detail_remove_confirm">Remove this broken clone from the list?</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="error_not_found">This clone does not exist.</string>
+</resources>

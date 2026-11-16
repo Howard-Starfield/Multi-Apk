@@ -17,6 +17,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "CloneLab"
 
+include ':app'
 include ':Bcore'
 project(':Bcore').projectDir = file('engine/Bcore')
 include ':black-reflection'
