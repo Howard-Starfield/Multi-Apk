@@ -6,6 +6,7 @@ import java.lang.reflect.Method;
 
 import black.android.content.BRAttributionSource;
 import top.niunaijun.blackbox.BlackBoxCore;
+import top.niunaijun.blackbox.core.device.DeviceProfileApplier;
 import top.niunaijun.blackbox.fake.hook.ClassInvocationStub;
 import top.niunaijun.blackbox.utils.compat.ContextCompat;
 
@@ -63,7 +64,7 @@ public class SystemProviderStub extends ClassInvocationStub implements BContentP
                     }
                 }
             }
-            return method.invoke(mBase, args);
+            return DeviceProfileApplier.patchSettingsCall(args, method.invoke(mBase, args));
         }
         
         

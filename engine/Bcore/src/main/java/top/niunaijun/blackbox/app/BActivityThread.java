@@ -66,6 +66,8 @@ import top.niunaijun.blackbox.core.CrashHandler;
 import top.niunaijun.blackbox.core.IBActivityThread;
 import top.niunaijun.blackbox.core.IOCore;
 import top.niunaijun.blackbox.core.NativeCore;
+import top.niunaijun.blackbox.core.device.DeviceProfileApplier;
+import top.niunaijun.blackbox.fake.frameworks.BDeviceManager;
 import top.niunaijun.blackbox.core.env.VirtualRuntime;
 import top.niunaijun.blackbox.core.system.user.BUserHandle;
 import top.niunaijun.blackbox.entity.AppConfig;
@@ -400,6 +402,11 @@ public class BActivityThread extends IBActivityThread.Stub {
         }
 
         NativeCore.init(Build.VERSION.SDK_INT);
+        try {
+            DeviceProfileApplier.apply(BDeviceManager.get().getProfile(getUserId(), packageName));
+        } catch (Throwable e) {
+            Slog.e(TAG, "Failed to apply device profile", e);
+        }
         assert packageContext != null;
         IOCore.get().enableRedirect(packageContext);
 

@@ -6,6 +6,8 @@ import java.lang.reflect.Method;
 import black.android.os.BRIDeviceIdentifiersPolicyServiceStub;
 import black.android.os.BRServiceManager;
 import top.niunaijun.blackbox.BlackBoxCore;
+import top.niunaijun.blackbox.core.device.DeviceProfileApplier;
+import top.niunaijun.blackbox.entity.device.BDeviceProfile;
 import top.niunaijun.blackbox.fake.hook.BinderInvocationStub;
 import top.niunaijun.blackbox.fake.hook.MethodHook;
 import top.niunaijun.blackbox.fake.hook.ProxyMethod;
@@ -39,6 +41,10 @@ public class IDeviceIdentifiersPolicyProxy extends BinderInvocationStub {
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
 
 
+            BDeviceProfile profile = DeviceProfileApplier.current();
+            if (profile != null && profile.serial != null) {
+                return profile.serial;
+            }
             return Md5Utils.md5(BlackBoxCore.getHostPkg());
         }
     }

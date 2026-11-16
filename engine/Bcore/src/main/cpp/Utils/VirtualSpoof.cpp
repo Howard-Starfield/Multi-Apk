@@ -1,3 +1,9 @@
+#include <jni.h>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 #include <sys/system_properties.h>
 #include <cstring>
 #include "./xdl.h"
@@ -9,49 +15,63 @@
 #define LOG_TAG "VirtualSpoof"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 
-struct SpoofedProp {
-    const char* key;
-    const char* value;
-};
+// Per-process override table, empty by default (real values pass through).
+// Replaced wholesale (copy-on-write) by setSpoofProps; readers take a shared_ptr snapshot.
+typedef std::vector<std::pair<std::string, std::string>> SpoofTable;
+static std::shared_ptr<const SpoofTable> g_spoof_table;
+static std::mutex g_spoof_mutex;
 
-SpoofedProp spoofed_props[] = {
-        {"ro.product.model", "Pixel 6"},
-        {"ro.product.brand", "google"},
-        {"ro.product.manufacturer", "Google"},
-        {"ro.product.device", "oriole"},
-        {"ro.build.fingerprint", "google/oriole/oriole:12/SP1A.210812.015/7679548:user/release-keys"},
-        {"ro.build.version.release", "12"},
-        {"ro.build.version.security_patch", "2022-01-05"},
-        {"ro.serialno", "1A2B3C4D5E6F"},
-        {"ro.hardware", "qcom"},
-        {"ro.boot.hardware", "qcom"},
-        {"ro.product.board", "lahaina"},
-        {"ro.product.cpu.abi", "arm64-v8a"},
-        {"ro.build.type", "user"},
-        {"ro.build.tags", "release-keys"},
-        {"ro.kernel.qemu", "0"},
-        {"ro.kernel.android.qemud", ""},
-        {"ro.hardware.egl", "adreno"},
-        {"ro.boot.qemu", "0"},
-    {nullptr, nullptr} 
-};
+static std::shared_ptr<const SpoofTable> get_spoof_table() {
+    std::lock_guard<std::mutex> lock(g_spoof_mutex);
+    return g_spoof_table;
+}
 
+void set_spoof_props(JNIEnv *env, jclass clazz, jobjectArray keys, jobjectArray values) {
+    auto table = std::make_shared<SpoofTable>();
+    if (keys != nullptr && values != nullptr) {
+        jsize n = env->GetArrayLength(keys);
+        if (env->GetArrayLength(values) < n) n = env->GetArrayLength(values);
+        for (jsize i = 0; i < n; ++i) {
+            jstring k = (jstring) env->GetObjectArrayElement(keys, i);
+            jstring v = (jstring) env->GetObjectArrayElement(values, i);
+            if (k != nullptr && v != nullptr) {
+                const char *kc = env->GetStringUTFChars(k, nullptr);
+                const char *vc = env->GetStringUTFChars(v, nullptr);
+                if (kc != nullptr && vc != nullptr) {
+                    table->emplace_back(kc, vc);
+                }
+                if (kc != nullptr) env->ReleaseStringUTFChars(k, kc);
+                if (vc != nullptr) env->ReleaseStringUTFChars(v, vc);
+            }
+            if (k != nullptr) env->DeleteLocalRef(k);
+            if (v != nullptr) env->DeleteLocalRef(v);
+        }
+    }
+    std::lock_guard<std::mutex> lock(g_spoof_mutex);
+    g_spoof_table = table;
+}
 
 static int (*orig_system_property_get)(const char *name, char *value) = nullptr;
 
 
 int my_system_property_get(const char *name, char *value) {
-    for (int i = 0; spoofed_props[i].key != nullptr; ++i) {
-        if (strcmp(name, spoofed_props[i].key) == 0) {
-            strcpy(value, spoofed_props[i].value);
-             LOGD("[spoof] %s = %s", name, value);
-            return strlen(value);
+    if (name != nullptr) {
+        std::shared_ptr<const SpoofTable> table = get_spoof_table();
+        if (table) {
+            for (const auto &entry : *table) {
+                if (entry.first == name) {
+                    // PROP_VALUE_MAX is 92 including the terminating NUL.
+                    strncpy(value, entry.second.c_str(), PROP_VALUE_MAX - 1);
+                    value[PROP_VALUE_MAX - 1] = 0;
+                    return (int) strlen(value);
+                }
+            }
         }
     }
     if (orig_system_property_get) {
         return orig_system_property_get(name, value);
     }
-    value[0] = '\0';
+    value[0] = 0;
     return 0;
 }
 

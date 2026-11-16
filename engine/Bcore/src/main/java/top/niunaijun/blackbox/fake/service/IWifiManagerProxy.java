@@ -1,5 +1,7 @@
 package top.niunaijun.blackbox.fake.service;
 
+import top.niunaijun.blackbox.core.device.DeviceProfileApplier;
+import top.niunaijun.blackbox.entity.device.BDeviceProfile;
 import android.content.Context;
 import android.net.wifi.WifiInfo;
 import android.util.Log;
@@ -43,8 +45,10 @@ public class IWifiManagerProxy extends BinderInvocationStub {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             WifiInfo wifiInfo = (WifiInfo) method.invoke(who, args);
+            BDeviceProfile profile = DeviceProfileApplier.current();
+            String mac = (profile != null && profile.wifiMac != null) ? profile.wifiMac : "ac:62:5a:82:65:c4";
             BRWifiInfo.get(wifiInfo)._set_mBSSID("ac:62:5a:82:65:c4");
-            BRWifiInfo.get(wifiInfo)._set_mMacAddress("ac:62:5a:82:65:c4");
+            BRWifiInfo.get(wifiInfo)._set_mMacAddress(mac);
             BRWifiInfo.get(wifiInfo)._set_mWifiSsid(BRWifiSsid.get().createFromAsciiEncoded("BlackBox_Wifi"));
             return wifiInfo;
         }

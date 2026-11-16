@@ -63,6 +63,10 @@ public class BEnvironment {
         return new File(getSystemDir(), "xposed-module.conf");
     }
 
+    public static File getDeviceProfileFile(int userId, String packageName) {
+        return new File(new File(new File(getSystemDir(), "device-profiles"), String.valueOf(userId)), packageName + ".json");
+    }
+
     public static File getFakeLocationConf() {
         return new File(getSystemDir(), "fake-location.conf");
     }

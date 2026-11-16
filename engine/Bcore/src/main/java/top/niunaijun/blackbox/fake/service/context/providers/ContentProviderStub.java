@@ -7,6 +7,7 @@ import java.lang.reflect.Method;
 import black.android.content.BRAttributionSource;
 import top.niunaijun.blackbox.app.BActivityThread;
 import top.niunaijun.blackbox.BlackBoxCore;
+import top.niunaijun.blackbox.core.device.DeviceProfileApplier;
 import top.niunaijun.blackbox.fake.hook.ClassInvocationStub;
 import top.niunaijun.blackbox.utils.compat.ContextCompat;
 import top.niunaijun.blackbox.utils.Slog;
@@ -82,7 +83,8 @@ public class ContentProviderStub extends ClassInvocationStub implements BContent
             
             
             try {
-                return method.invoke(mBase, args);
+                Object result = method.invoke(mBase, args);
+                return methodName.equals("call") ? DeviceProfileApplier.patchSettingsCall(args, result) : result;
             } catch (Throwable e) {
                 
                 Throwable cause = e.getCause();

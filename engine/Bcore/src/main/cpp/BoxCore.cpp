@@ -131,9 +131,12 @@ bool disableResourceLoading(JNIEnv *env, jclass clazz) {
     return true;
 }
 
+void set_spoof_props(JNIEnv *env, jclass clazz, jobjectArray keys, jobjectArray values);
+
 static JNINativeMethod gMethods[] = {
         {"disableHiddenApi", "()Z",                               (void *) disableHiddenApi},
         {"disableResourceLoading", "()Z",                         (void *) disableResourceLoading},
+        {"setSpoofProps", "([Ljava/lang/String;[Ljava/lang/String;)V", (void *) set_spoof_props},
         {"hideXposed", "()V",                                     (void *) hideXposed},
         {"addIORule",  "(Ljava/lang/String;Ljava/lang/String;)V", (void *) addIORule},
         {"enableIO",   "()V",                                     (void *) enableIO},

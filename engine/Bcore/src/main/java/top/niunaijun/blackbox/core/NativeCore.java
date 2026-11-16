@@ -38,6 +38,8 @@ public class NativeCore {
     
     public static native boolean disableResourceLoading();
 
+    public static native void setSpoofProps(String[] keys, String[] values);
+
 
     @Keep
     public static int getCallingUid(int origCallingUid) {
