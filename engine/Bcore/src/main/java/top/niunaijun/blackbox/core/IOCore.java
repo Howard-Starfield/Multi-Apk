@@ -64,9 +64,13 @@ public class IOCore {
         if (path.contains("/blackbox/")) {
             return path;
         }
-        String search = sBlackTree.search(path);
-        if (!TextUtils.isEmpty(search))
-            return search;
+        // An exempt folder: leave the path exactly as it is. (The search returns the matching
+        // prefix, not the path; returning that prefix turned every file into its folder.)
+        String exempt = sBlackTree.search(path);
+        if (!TextUtils.isEmpty(exempt)
+                && (path.length() == exempt.length() || path.charAt(exempt.length()) == '/')) {
+            return path;
+        }
 
         
         String key = mTrieTree.search(path);
@@ -104,6 +108,10 @@ public class IOCore {
 
     
 
+    private static final String[] SHARED_MEDIA_DIRS = {
+            "DCIM", "Pictures", "Movies", "Music", "Download", "Documents",
+    };
+
     public void enableRedirect(Context context) {
         Map<String, String> rule = new LinkedHashMap<>();
         Set<String> blackRule = new HashSet<>();
@@ -138,8 +146,14 @@ public class IOCore {
                 rule.put("/sdcard", external.getAbsolutePath());
                 rule.put(String.format("/storage/emulated/%d", systemUserId), external.getAbsolutePath());
 
-                blackRule.add("/sdcard/Pictures");
-                blackRule.add(String.format("/storage/emulated/%d/Pictures", systemUserId));
+                // The phone's shared media folders stay real, as they are for any app, so a
+                // clone's photo picker can open the files the system media store lists.
+                // Everything else on external storage (including Android/data and the folders
+                // apps create for themselves) remains private to each clone.
+                for (String shared : SHARED_MEDIA_DIRS) {
+                    blackRule.add("/sdcard/" + shared);
+                    blackRule.add(String.format("/storage/emulated/%d/%s", systemUserId, shared));
+                }
             }
             if (BlackBoxCore.get().isHideRoot()) {
                 hideRoot(rule);
