@@ -22,11 +22,13 @@ import dev.clonelab.app.macro.MacroRunState
 import dev.clonelab.app.macro.MacroRunner
 import dev.clonelab.app.macro.MacroSchedule
 import dev.clonelab.app.macro.ScreenMetrics
+import dev.clonelab.app.macro.ui.MacroOverlays
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.CloneRecord
 import dev.clonelab.app.switcher.FocusDebouncer
 import dev.clonelab.app.switcher.SwitcherItem
 import dev.clonelab.app.switcher.SwitcherModel
+import dev.clonelab.app.switcher.SwitcherState
 import dev.clonelab.app.switcher.SwitcherOverlay
 import dev.clonelab.app.switcher.SwitcherPrefs
 import dev.clonelab.app.ui.AppVisuals
@@ -57,6 +59,9 @@ class KeepAliveService : Service() {
     /** Touched on the main thread only. */
     private var overlay: SwitcherOverlay? = null
 
+    /** The macro panel, editor and bars. Touched on the main thread only. */
+    private var macroOverlays: MacroOverlays? = null
+
     /** Id of the latest start command; stopSelf(id) is ignored by Android if a newer start arrived. */
     @Volatile
     private var latestStartId = 0
@@ -73,7 +78,7 @@ class KeepAliveService : Service() {
         notifications = KeepAliveNotifications(this)
         notifications.createChannels()
         ManualStops.install(this)
-        overlay = SwitcherOverlay(this, SwitcherPrefs(this), ::switchTo)
+        overlay = SwitcherOverlay(this, SwitcherPrefs(this), ::switchTo, onMacros = { macroOverlays?.openPanel() })
         val runner = MacroRunner(
             scope = scope,
             recorder = ServiceLocator.macroRecorder(this),
@@ -86,6 +91,8 @@ class KeepAliveService : Service() {
         )
         macroRunnerField = runner
         runnerRef = WeakReference(runner)
+        macroOverlays = MacroOverlays(this, scope, { macroRunner }, { busy -> overlay?.setMacroBusy(busy) })
+            .also { it.start() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -122,6 +129,7 @@ class KeepAliveService : Service() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         overlay?.onConfigurationChanged()
+        macroOverlays?.onConfigurationChanged()
     }
 
     override fun onDestroy() {
@@ -130,7 +138,9 @@ class KeepAliveService : Service() {
         macroRunnerField = null
         scope.cancel()
         mainHandler.removeCallbacksAndMessages(null)
-        // Cancelled coroutines may still have main-thread work queued: remove the window right here.
+        // Cancelled coroutines may still have main-thread work queued: remove the windows right here.
+        macroOverlays?.destroy()
+        macroOverlays = null
         overlay?.hide()
         overlay = null
         super.onDestroy()
@@ -239,6 +249,11 @@ class KeepAliveService : Service() {
                 }
                 val shownIcons = icons
                 withContext(Dispatchers.Main.immediate) {
+                    val focusedId = items.firstOrNull { it.state == SwitcherState.FOCUSED }?.id
+                    val appLabel = focusedId?.let { id ->
+                        lastRecords?.firstOrNull { it.id.packageName == id.packageName }?.appLabel
+                    } ?: focusedId?.packageName.orEmpty()
+                    macroOverlays?.onFocusChanged(focusedId, appLabel)
                     val window = overlay ?: return@withContext
                     if (items.isEmpty()) {
                         pushed = null

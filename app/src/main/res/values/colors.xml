@@ -26,4 +26,6 @@
         <item>@color/swatch_teal</item>
         <item>@color/swatch_slate</item>
     </array>
+    <color name="macro_scrim">#99000000</color>
+    <color name="macro_text_dim">#B3FFFFFF</color>
 </resources>

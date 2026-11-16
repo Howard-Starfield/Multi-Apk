@@ -31,6 +31,33 @@
             android:layout_width="80dp"
             android:layout_height="40dp"
             android:overScrollMode="never" />
+
+        <FrameLayout
+            android:id="@+id/macros"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:layout_marginTop="4dp"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:contentDescription="@string/macros_button"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_macro" />
+
+            <View
+                android:id="@+id/macrosDot"
+                android:layout_width="9dp"
+                android:layout_height="9dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="3dp"
+                android:layout_marginEnd="14dp"
+                android:visibility="gone" />
+        </FrameLayout>
     </LinearLayout>
 
     <!-- The window is wider and taller than the visible tab so the handle is easy to hit. -->

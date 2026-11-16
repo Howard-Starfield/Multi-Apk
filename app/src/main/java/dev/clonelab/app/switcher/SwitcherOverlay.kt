@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import dev.clonelab.app.R
+import dev.clonelab.app.macro.ui.MacroBusy
 import dev.clonelab.app.model.CloneId
 import kotlin.math.hypot
 
@@ -35,6 +36,7 @@ class SwitcherOverlay(
     context: Context,
     private val prefs: SwitcherPrefs,
     onSelect: (CloneId) -> Unit,
+    private val onMacros: () -> Unit = {},
 ) {
     private val themed = ContextThemeWrapper(context, R.style.Theme_CloneLab)
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -58,6 +60,8 @@ class SwitcherOverlay(
     private var list: RecyclerView? = null
     private var tab: View? = null
     private var grip: View? = null
+    private var macrosDot: View? = null
+    private var macroBusy = MacroBusy.NONE
     private var params: WindowManager.LayoutParams? = null
 
     val isShown: Boolean get() = root != null
@@ -76,7 +80,29 @@ class SwitcherOverlay(
             rv.layoutParams = lp
         }
         applyCollapsed()
+        applyMacroBusy()
         reposition()
+    }
+
+    /** Red dot while a recording runs, green while a macro plays. */
+    fun setMacroBusy(value: MacroBusy) {
+        macroBusy = value
+        applyMacroBusy()
+    }
+
+    private fun applyMacroBusy() {
+        val dot = macrosDot ?: return
+        when (macroBusy) {
+            MacroBusy.NONE -> dot.visibility = View.GONE
+            MacroBusy.RECORDING -> {
+                dot.setBackgroundResource(R.drawable.bg_macro_dot_red)
+                dot.visibility = View.VISIBLE
+            }
+            MacroBusy.PLAYING -> {
+                dot.setBackgroundResource(R.drawable.bg_running_dot)
+                dot.visibility = View.VISIBLE
+            }
+        }
     }
 
     fun hide() {
@@ -88,6 +114,7 @@ class SwitcherOverlay(
         val view = root ?: return
         root = null
         grip = null
+        macrosDot = null
         pill = null
         list = null
         tab = null
@@ -122,6 +149,11 @@ class SwitcherOverlay(
         val drag = DragListener()
         view.findViewById<View>(R.id.handle).setOnTouchListener(drag)
         view.findViewById<View>(R.id.tab).setOnTouchListener(drag)
+        // The Macros button folds the pill away and hands over to the macro panel.
+        view.findViewById<View>(R.id.macros).setOnClickListener {
+            setCollapsed(true)
+            onMacros()
+        }
         // A touch anywhere else on the screen folds the pill away. The touch itself still reaches
         // the clone underneath: this window only watches it.
         view.setOnTouchListener { _, event ->
@@ -169,6 +201,7 @@ class SwitcherOverlay(
         list = rv
         tab = view.findViewById(R.id.tab)
         grip = view.findViewById(R.id.grip)
+        macrosDot = view.findViewById(R.id.macrosDot)
         params = lp
         return true
     }
