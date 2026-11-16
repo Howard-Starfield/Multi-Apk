@@ -424,7 +424,9 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
             userSpace = mUserSpace.get(processRecord.userId);
         }
         if (userSpace != null) {
-            userSpace.mStack.onProcessDied(processRecord);
+            synchronized (userSpace.mStack) {
+                userSpace.mStack.onProcessDied(processRecord);
+            }
         }
     }
 

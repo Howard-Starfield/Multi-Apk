@@ -82,7 +82,13 @@ public class InnerReceiverDelegate extends IIntentReceiver.Stub {
     /** Lets an ordered broadcast move on when this receiver skips it. */
     private void finishSkipped(int resultCode, String data, Bundle extras, int flags) {
         try {
-            Object am = android.app.ActivityManager.class.getMethod("getService").invoke(null);
+            Object am;
+            try {
+                am = android.app.ActivityManager.class.getMethod("getService").invoke(null);
+            } catch (NoSuchMethodException e) {
+                // API 21-25
+                am = Class.forName("android.app.ActivityManagerNative").getMethod("getDefault").invoke(null);
+            }
             for (java.lang.reflect.Method m : am.getClass().getMethods()) {
                 if (m.getName().equals("finishReceiver") && m.getParameterTypes().length == 6) {
                     m.invoke(am, this, resultCode, data, extras, false, flags);

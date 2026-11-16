@@ -58,9 +58,47 @@ public class IOCore {
         sBlackTree.add(path);
     }
 
+    /**
+     * Purely textual normalisation of an absolute path: drops "." segments and duplicate
+     * slashes and resolves ".." (never above the root). Relative paths are returned untouched.
+     */
+    static String normalizePath(String path) {
+        if (path == null || path.isEmpty() || path.charAt(0) != '/') {
+            return path;
+        }
+        if (!path.contains("/.") && !path.contains("//")) {
+            return path;
+        }
+        java.util.ArrayList<String> parts = new java.util.ArrayList<>();
+        for (String seg : path.split("/")) {
+            if (seg.isEmpty() || seg.equals(".")) {
+                continue;
+            }
+            if (seg.equals("..")) {
+                if (!parts.isEmpty()) {
+                    parts.remove(parts.size() - 1);
+                }
+                continue;
+            }
+            parts.add(seg);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            sb.append('/').append(part);
+        }
+        if (sb.length() == 0) {
+            return "/";
+        }
+        if (path.endsWith("/")) {
+            sb.append('/');
+        }
+        return sb.toString();
+    }
+
     public String redirectPath(String path) {
         if (TextUtils.isEmpty(path))
             return path;
+        path = normalizePath(path);
         if (path.contains("/blackbox/")) {
             return path;
         }

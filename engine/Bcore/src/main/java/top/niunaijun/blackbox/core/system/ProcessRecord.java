@@ -23,6 +23,20 @@ public class ProcessRecord extends Binder {
     public int bpid;
     public int callingBUid;
     public int userId;
+    private boolean dead;
+
+    /** Marks this record's death as handled. True only for the first caller. */
+    public synchronized boolean markDead() {
+        if (dead) {
+            return false;
+        }
+        dead = true;
+        return true;
+    }
+
+    public synchronized boolean isDead() {
+        return dead;
+    }
 
     public ConditionVariable initLock = new ConditionVariable();
 

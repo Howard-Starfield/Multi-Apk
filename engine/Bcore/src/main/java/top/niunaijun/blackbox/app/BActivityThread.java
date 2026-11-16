@@ -97,6 +97,8 @@ public class BActivityThread extends IBActivityThread.Stub {
     private Application mInitialApplication;
     private AppConfig mAppConfig;
     private final List<ProviderInfo> mProviders = new ArrayList<>();
+    // Every provider of the package, unfiltered (mProviders only holds this process's own).
+    private final List<ProviderInfo> mAllProviders = new ArrayList<>();
     private final Handler mH = BlackBoxCore.get().getHandler();
     private static final Object mConfigLock = new Object();
 
@@ -123,6 +125,11 @@ public class BActivityThread extends IBActivityThread.Stub {
 
     public static List<ProviderInfo> getProviders() {
         return currentActivityThread().mProviders;
+    }
+
+    /** All providers declared by the package, regardless of which process hosts them. */
+    public static List<ProviderInfo> getAllProviders() {
+        return currentActivityThread().mAllProviders;
     }
 
     public static String getAppProcessName() {
@@ -375,6 +382,7 @@ public class BActivityThread extends IBActivityThread.Stub {
         // list ends up in AppBindData.providers, and app packers (which install providers
         // themselves after unpacking) install whatever is in it.
         for (ProviderInfo providerInfo : packageInfo.providers) {
+            mAllProviders.add(providerInfo);
             if (providerInfo.multiprocess || processName.equals(providerInfo.processName)) {
                 mProviders.add(providerInfo);
             }

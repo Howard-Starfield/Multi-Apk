@@ -1701,7 +1701,8 @@ public class BlackBoxCore extends ClientConfiguration {
      */
     public boolean isEngineAlive() {
         try {
-            IBinder binder = getService(ServiceManager.PACKAGE_MANAGER);
+            // Pure probe: only the cached binder. getService() would restart :black and sleep.
+            IBinder binder = mServices.get(ServiceManager.PACKAGE_MANAGER);
             return binder != null && binder.isBinderAlive() && binder.pingBinder();
         } catch (Throwable e) {
             Slog.w(TAG, "isEngineAlive failed: " + e.getMessage());

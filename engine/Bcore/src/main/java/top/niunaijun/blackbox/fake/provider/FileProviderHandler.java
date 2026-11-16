@@ -25,7 +25,7 @@ public class FileProviderHandler {
     }
 
     public static File convertFile(Context context, Uri uri) {
-        List<ProviderInfo> providers = BActivityThread.getProviders();
+        List<ProviderInfo> providers = BActivityThread.getAllProviders();
         for (ProviderInfo provider : providers) {
             try {
                 File fileForUri = FileProvider.getFileForUri(context, provider.authority, uri);

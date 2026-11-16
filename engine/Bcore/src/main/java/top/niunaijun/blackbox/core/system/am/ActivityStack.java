@@ -494,6 +494,10 @@ public class ActivityStack {
             record.token = token;
             record.processRecord = processRecord;
             record.task = taskRecord;
+            // onProcessDied marked this record finished; the system may recreate the same stub
+            // activity later and hand the same record back.
+            record.finished = false;
+            taskRecord.removeActivity(record);
             taskRecord.addTopActivity(record);
             Log.d(TAG, "onActivityCreated : " + record.component.toString());
         }

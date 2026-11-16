@@ -52,6 +52,8 @@ public class BProcessManagerService implements ISystemService {
             return null;
         ProcessRecord app;
         int buid = BUserHandle.getUid(userId, BPackageManagerService.get().getAppId(packageName));
+        ProcessRecord stale = null;
+        try {
         synchronized (mProcessLock) {
             Map<String, ProcessRecord> bProcess = mProcessMap.get(buid);
 
@@ -72,6 +74,13 @@ public class BProcessManagerService implements ISystemService {
                     Slog.w(TAG, "dropping stale process record " + processName + " u" + app.userId + " bpid " + app.bpid);
                     bProcess.remove(processName);
                     mPidsSelfLocked.remove(app);
+                    // Full cleanup now: the slot is about to be reused, and the late binderDied
+                    // callback must not touch the new process (it is a no-op once marked dead).
+                    if (app.markDead()) {
+                        stale = app;
+                        removeProc(app);
+                        BNotificationManagerService.get().deletePackageNotification(app.getPackageName(), app.userId);
+                    }
                 }
                 bpid = getUsingBPidL();
                 Slog.d(TAG, "init bUid = " + buid + ", bPid = " + bpid);
@@ -101,7 +110,21 @@ public class BProcessManagerService implements ISystemService {
                 app.pid = getPid(BlackBoxCore.getContext(), ProxyManifest.getProcessName(app.bpid));
             }
         }
+        } finally {
+            if (stale != null) {
+                // Outside mProcessLock, like onProcessDie: it takes the activity stack lock.
+                notifyActivityStackDied(stale);
+            }
+        }
         return app;
+    }
+
+    private static void notifyActivityStackDied(ProcessRecord record) {
+        try {
+            top.niunaijun.blackbox.core.system.am.BActivityManagerService.get().onProcessDied(record);
+        } catch (Throwable t) {
+            Slog.w(TAG, "onProcessDied cleanup failed: " + t);
+        }
     }
 
     private int getUsingBPidL() {
@@ -203,18 +226,46 @@ public class BProcessManagerService implements ISystemService {
     }
 
     private static boolean isAliveL(ProcessRecord record) {
-        if (record.bActivityThread == null) {
+        // pingBinder() can fail for a healthy but frozen (cached-app freezer) process, so it is
+        // not used. A record is stale only when its binder is dead and its pid is gone too.
+        try {
+            if (record.bActivityThread != null) {
+                IBinder binder = record.bActivityThread.asBinder();
+                if (binder != null && binder.isBinderAlive()) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return isPidRunning(record);
+    }
+
+    /** True when record.pid is still a running stub process of our uid with the expected name. */
+    private static boolean isPidRunning(ProcessRecord record) {
+        if (record.pid <= 0) {
             return false;
         }
         try {
-            IBinder binder = record.bActivityThread.asBinder();
-            return binder != null && binder.isBinderAlive() && binder.pingBinder();
-        } catch (Throwable t) {
-            return false;
+            ActivityManager manager = (ActivityManager) BlackBoxCore.getContext().getSystemService(Context.ACTIVITY_SERVICE);
+            List<ActivityManager.RunningAppProcessInfo> processes = manager.getRunningAppProcesses();
+            if (processes == null) {
+                return false;
+            }
+            String stubName = ProxyManifest.getProcessName(record.bpid);
+            for (ActivityManager.RunningAppProcessInfo info : processes) {
+                if (info.pid == record.pid && info.uid == Process.myUid() && stubName.equals(info.processName)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
         }
+        return false;
     }
 
     public void onProcessDie(ProcessRecord record) {
+        if (!record.markDead()) {
+            return; // already cleaned up (e.g. dropped as stale when its slot was reused)
+        }
         synchronized (mProcessLock) {
             record.kill();
             int key = mapKey(record);
@@ -230,14 +281,30 @@ public class BProcessManagerService implements ISystemService {
             }
             mPidsSelfLocked.remove(record);
 
-            removeProc(record);
-            BNotificationManagerService.get().deletePackageNotification(record.getPackageName(), record.userId);
+            boolean slotReused = false;
+            boolean replaced = false;
+            synchronized (mPidsSelfLocked) {
+                for (ProcessRecord other : mPidsSelfLocked) {
+                    if (other == record || other.isDead()) {
+                        continue;
+                    }
+                    if (other.bpid == record.bpid) {
+                        slotReused = true;
+                    }
+                    if (other.userId == record.userId && other.processName.equals(record.processName)
+                            && other.getPackageName().equals(record.getPackageName())) {
+                        replaced = true;
+                    }
+                }
+            }
+            if (!slotReused) {
+                removeProc(record);
+            }
+            if (!replaced) {
+                BNotificationManagerService.get().deletePackageNotification(record.getPackageName(), record.userId);
+            }
         }
-        try {
-            top.niunaijun.blackbox.core.system.am.BActivityManagerService.get().onProcessDied(record);
-        } catch (Throwable t) {
-            Slog.w(TAG, "onProcessDied cleanup failed: " + t);
-        }
+        notifyActivityStackDied(record);
     }
 
     public ProcessRecord findProcessRecord(String packageName, String processName, int userId) {
