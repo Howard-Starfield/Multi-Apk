@@ -1,0 +1,18 @@
+# Reference material used only for feature analysis — never committed
+*.apk
+apk_extracted/
+tools/
+upstream/
+
+# Build output
+.gradle/
+build/
+**/build/
+local.properties
+.cxx/
+**/.cxx/
+*.iml
+.idea/
+captures/
+*.keystore
+*.jks

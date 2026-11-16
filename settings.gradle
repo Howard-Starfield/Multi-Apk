@@ -1,0 +1,25 @@
+pluginManagement {
+    repositories {
+        maven { url "https://www.jitpack.io" }
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        maven { url "https://www.jitpack.io" }
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "CloneLab"
+
+include ':Bcore'
+project(':Bcore').projectDir = file('engine/Bcore')
+include ':black-reflection'
+project(':black-reflection').projectDir = file('engine/black-reflection')
+include ':compiler'
+project(':compiler').projectDir = file('engine/compiler')
