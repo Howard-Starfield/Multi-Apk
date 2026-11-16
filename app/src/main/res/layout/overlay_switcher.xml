@@ -16,7 +16,7 @@
         <FrameLayout
             android:id="@+id/handle"
             android:layout_width="match_parent"
-            android:layout_height="22dp"
+            android:layout_height="30dp"
             android:contentDescription="@string/switcher_handle">
 
             <View
@@ -33,16 +33,18 @@
             android:overScrollMode="never" />
     </LinearLayout>
 
+    <!-- The window is wider and taller than the visible tab so the handle is easy to hit. -->
     <FrameLayout
         android:id="@+id/tab"
-        android:layout_width="16dp"
-        android:layout_height="48dp"
+        android:layout_width="36dp"
+        android:layout_height="80dp"
         android:contentDescription="@string/switcher_handle"
         android:visibility="gone">
 
         <View
             android:id="@+id/grip"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_width="14dp"
+            android:layout_height="48dp"
+            android:layout_gravity="end|center_vertical" />
     </FrameLayout>
 </FrameLayout>

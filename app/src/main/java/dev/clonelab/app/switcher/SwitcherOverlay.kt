@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -16,6 +17,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
+import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -47,10 +50,14 @@ class SwitcherOverlay(
     /** The pill always starts as the slim tab and folds back to it when left alone. */
     private var collapsed = true
 
+    /** True while the expand or collapse animation runs; taps are ignored until it ends. */
+    private var animating = false
+
     private var root: View? = null
     private var pill: View? = null
     private var list: RecyclerView? = null
     private var tab: View? = null
+    private var grip: View? = null
     private var params: WindowManager.LayoutParams? = null
 
     val isShown: Boolean get() = root != null
@@ -75,8 +82,12 @@ class SwitcherOverlay(
     fun hide() {
         handler.removeCallbacks(autoCollapse)
         collapsed = true
+        animating = false
+        pill?.animate()?.cancel()
+        tab?.animate()?.cancel()
         val view = root ?: return
         root = null
+        grip = null
         pill = null
         list = null
         tab = null
@@ -111,6 +122,12 @@ class SwitcherOverlay(
         val drag = DragListener()
         view.findViewById<View>(R.id.handle).setOnTouchListener(drag)
         view.findViewById<View>(R.id.tab).setOnTouchListener(drag)
+        // A touch anywhere else on the screen folds the pill away. The touch itself still reaches
+        // the clone underneath: this window only watches it.
+        view.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_OUTSIDE && !collapsed) setCollapsed(true)
+            false
+        }
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -124,6 +141,7 @@ class SwitcherOverlay(
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
@@ -150,27 +168,94 @@ class SwitcherOverlay(
         pill = view.findViewById(R.id.pill)
         list = rv
         tab = view.findViewById(R.id.tab)
-        view.findViewById<View>(R.id.grip).background =
-            GripDotsDrawable(dotRadius = 1.5f * density, gap = 3f * density, color = GRIP_COLOR)
+        grip = view.findViewById(R.id.grip)
         params = lp
         return true
     }
 
     private fun applyCollapsed() {
         pill?.visibility = if (collapsed) View.GONE else View.VISIBLE
-        tab?.let {
-            it.visibility = if (collapsed) View.VISIBLE else View.GONE
-            it.background = tabBackground(prefs.edge)
+        tab?.visibility = if (collapsed) View.VISIBLE else View.GONE
+        grip?.let {
+            val left = prefs.edge == SwitcherGeometry.EDGE_LEFT
+            (it.layoutParams as FrameLayout.LayoutParams).let { lp ->
+                val gravity = (if (left) Gravity.START else Gravity.END) or Gravity.CENTER_VERTICAL
+                if (lp.gravity != gravity) {
+                    lp.gravity = gravity
+                    it.layoutParams = lp
+                }
+            }
+            it.background = LayerDrawable(
+                arrayOf(
+                    tabBackground(prefs.edge),
+                    GripDotsDrawable(dotRadius = 1.5f * density, gap = 3f * density, color = GRIP_COLOR),
+                ),
+            )
         }
     }
 
+    /** Expands or collapses with a short scale-and-fade that grows out of the screen edge. */
     private fun setCollapsed(value: Boolean) {
         handler.removeCallbacks(autoCollapse)
-        collapsed = value
-        if (root == null) return
-        applyCollapsed()
-        reposition()
-        if (!value) scheduleCollapse(COLLAPSE_IDLE_MS)
+        if (root == null) {
+            collapsed = value
+            return
+        }
+        if (animating || value == collapsed) {
+            if (!collapsed) scheduleCollapse(COLLAPSE_IDLE_MS)
+            return
+        }
+        val pillView = pill
+        val tabView = tab
+        if (pillView == null || tabView == null) {
+            collapsed = value
+            applyCollapsed()
+            reposition()
+            return
+        }
+        animating = true
+        if (value) {
+            pillView.animate().cancel()
+            setPivotToEdge(pillView)
+            pillView.animate()
+                .alpha(0f).scaleX(SHRUNK_SCALE).scaleY(SHRUNK_SCALE)
+                .setDuration(COLLAPSE_MS).setInterpolator(DecelerateInterpolator())
+                .withEndAction {
+                    collapsed = true
+                    animating = false
+                    pillView.alpha = 1f
+                    pillView.scaleX = 1f
+                    pillView.scaleY = 1f
+                    if (root == null) return@withEndAction
+                    applyCollapsed()
+                    reposition()
+                    tabView.alpha = 0f
+                    tabView.animate().alpha(1f).setDuration(TAB_FADE_MS).start()
+                }
+                .start()
+        } else {
+            collapsed = false
+            applyCollapsed()
+            reposition()
+            pillView.alpha = 0f
+            pillView.scaleX = SHRUNK_SCALE
+            pillView.scaleY = SHRUNK_SCALE
+            // The pill has just become visible; its size is known after the next layout pass.
+            pillView.post {
+                setPivotToEdge(pillView)
+                pillView.animate()
+                    .alpha(1f).scaleX(1f).scaleY(1f)
+                    .setDuration(EXPAND_MS).setInterpolator(DecelerateInterpolator())
+                    .withEndAction { animating = false }
+                    .start()
+            }
+            scheduleCollapse(COLLAPSE_IDLE_MS)
+        }
+    }
+
+    private fun setPivotToEdge(view: View) {
+        view.pivotX = if (prefs.edge == SwitcherGeometry.EDGE_LEFT) 0f else view.width.toFloat()
+        view.pivotY = dp(TAB_CENTER_DP).toFloat().coerceAtMost(view.height.toFloat())
     }
 
     private fun scheduleCollapse(delayMs: Long) {
@@ -248,7 +333,7 @@ class SwitcherOverlay(
                 MotionEvent.ACTION_MOVE -> {
                     val dx = event.rawX - downX
                     val dy = event.rawY - downY
-                    if (!dragging && hypot(dx, dy) > touchSlop) dragging = true
+                    if (!dragging && hypot(dx, dy) > touchSlop * TAP_SLOP_FACTOR) dragging = true
                     if (dragging) {
                         val screen = screenSize()
                         val width = view.width.takeIf { it > 0 } ?: view.measuredWidth
@@ -284,6 +369,14 @@ class SwitcherOverlay(
         const val ROW_DP = 40
         const val TAB_COLOR = 0x661C1B1F // slim and see-through: it sits on top of the clone
         const val GRIP_COLOR = 0xCCFFFFFF.toInt()
+        const val EXPAND_MS = 200L
+        const val COLLAPSE_MS = 150L
+        const val TAB_FADE_MS = 120L
+        const val SHRUNK_SCALE = 0.6f
+        const val TAB_CENTER_DP = 40
+
+        /** A finger on a small edge handle wobbles; allow more movement before a tap becomes a drag. */
+        const val TAP_SLOP_FACTOR = 2f
         const val COLLAPSE_IDLE_MS = 4_000L
         const val COLLAPSE_AFTER_SELECT_MS = 400L
     }
