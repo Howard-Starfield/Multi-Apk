@@ -62,12 +62,35 @@ public class InnerReceiverDelegate extends IIntentReceiver.Stub {
         if (proxyBroadcastRecord.mIntent != null) {
             proxyBroadcastRecord.mIntent.setExtrasClassLoader(BlackBoxCore.getApplication().getClassLoader());
             perIntent = proxyBroadcastRecord.mIntent;
+            // Sent by a clone: every clone registers its receivers under the host package, so the
+            // system matches by action alone. Deliver only inside the sender's own virtual user.
+            if (proxyBroadcastRecord.mUserId != BActivityThread.getUserId()) {
+                if (ordered) {
+                    finishSkipped(resultCode, data, extras, intent.getFlags());
+                }
+                return;
+            }
         } else {
             perIntent = intent;
         }
         IIntentReceiver iIntentReceiver = mIntentReceiver.get();
         if (iIntentReceiver != null) {
             BRIIntentReceiver.get(iIntentReceiver).performReceive(perIntent, resultCode, data, extras, ordered, sticky, sendingUser);
+        }
+    }
+
+    /** Lets an ordered broadcast move on when this receiver skips it. */
+    private void finishSkipped(int resultCode, String data, Bundle extras, int flags) {
+        try {
+            Object am = android.app.ActivityManager.class.getMethod("getService").invoke(null);
+            for (java.lang.reflect.Method m : am.getClass().getMethods()) {
+                if (m.getName().equals("finishReceiver") && m.getParameterTypes().length == 6) {
+                    m.invoke(am, this, resultCode, data, extras, false, flags);
+                    return;
+                }
+            }
+        } catch (Throwable t) {
+            t.printStackTrace();
         }
     }
 }

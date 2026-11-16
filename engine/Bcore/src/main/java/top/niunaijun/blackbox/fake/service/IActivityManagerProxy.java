@@ -339,6 +339,24 @@ public class IActivityManagerProxy extends ClassInvocationStub {
     }
 
     public static Object BindServiceCommon(Object who, Method method, Object[] args,int callingPackageIndex) throws Throwable {
+        return BindServiceCommon(who, method, args, callingPackageIndex, -1);
+    }
+
+    /**
+     * @param instanceNameIndex index of the isolated-service instance name in args, or -1.
+     *                          A bind that is redirected to a (non-isolated) proxy service must
+     *                          not carry an instance name. A bind that passes through to the
+     *                          real system (e.g. the WebView sandboxed renderer) must keep one,
+     *                          and it has to be unique per process: every clone process shares
+     *                          the host uid and package, so the names WebView picks ("0", "1",
+     *                          ...) would otherwise collide across processes.
+     */
+    public static Object BindServiceCommon(Object who, Method method, Object[] args,int callingPackageIndex, int instanceNameIndex) throws Throwable {
+        String instanceName = null;
+        if (instanceNameIndex >= 0 && instanceNameIndex < args.length && args[instanceNameIndex] instanceof String) {
+            instanceName = (String) args[instanceNameIndex];
+            args[instanceNameIndex] = instanceName + "_" + android.os.Process.myPid();
+        }
         try {
             Intent intent = (Intent) args[2];
             String resolvedType = (String) args[3];
@@ -387,6 +405,10 @@ public class IActivityManagerProxy extends ClassInvocationStub {
 
                 if (proxyIntent != null) {
                     args[2] = proxyIntent;
+                    if (instanceName != null && proxyIntent.getComponent() != null
+                            && proxyIntent.getComponent().getPackageName().equals(BlackBoxCore.getHostPkg())) {
+                        args[instanceNameIndex] = null;
+                    }
                     return method.invoke(who, args);
                 }
             }
@@ -426,7 +448,7 @@ public class IActivityManagerProxy extends ClassInvocationStub {
     public static class bindServiceInstance extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            return BindServiceCommon(who,method,args,7);
+            return BindServiceCommon(who,method,args,7,6);
         }
 
         @Override
@@ -440,9 +462,7 @@ public class IActivityManagerProxy extends ClassInvocationStub {
     public static class BindIsolatedService extends MethodHook {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
-            
-            args[6] = null;
-            return BindServiceCommon(who,method,args,7);
+            return BindServiceCommon(who,method,args,7,6);
         }
 
         @Override

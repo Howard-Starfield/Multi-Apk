@@ -64,9 +64,14 @@ public class BProcessManagerService implements ISystemService {
                     if (app.initLock != null) {
                         app.initLock.block();
                     }
-                    if (app.bActivityThread != null) {
+                    if (isAliveL(app)) {
                         return app;
                     }
+                    // A record whose process is gone must never be handed out: its slot (bpid)
+                    // may already belong to another clone.
+                    Slog.w(TAG, "dropping stale process record " + processName + " u" + app.userId + " bpid " + app.bpid);
+                    bProcess.remove(processName);
+                    mPidsSelfLocked.remove(app);
                 }
                 bpid = getUsingBPidL();
                 Slog.d(TAG, "init bUid = " + buid + ", bPid = " + bpid);
@@ -189,14 +194,38 @@ public class BProcessManagerService implements ISystemService {
         app.initLock.open();
     }
 
+    /**
+     * Key of {@link #mProcessMap}. {@link ProcessRecord#buid} holds only the app id, so the
+     * user must be added back; using buid alone addresses user 0's entry for every user.
+     */
+    private static int mapKey(ProcessRecord record) {
+        return BUserHandle.getUid(record.userId, BUserHandle.getAppId(record.buid));
+    }
+
+    private static boolean isAliveL(ProcessRecord record) {
+        if (record.bActivityThread == null) {
+            return false;
+        }
+        try {
+            IBinder binder = record.bActivityThread.asBinder();
+            return binder != null && binder.isBinderAlive() && binder.pingBinder();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     public void onProcessDie(ProcessRecord record) {
         synchronized (mProcessLock) {
             record.kill();
-            Map<String, ProcessRecord> process = mProcessMap.get(record.buid);
+            int key = mapKey(record);
+            Slog.d(TAG, "process died: " + record.processName + " u" + record.userId + " bpid " + record.bpid);
+            Map<String, ProcessRecord> process = mProcessMap.get(key);
             if (process != null) {
-                process.remove(record.processName);
+                if (process.get(record.processName) == record) {
+                    process.remove(record.processName);
+                }
                 if (process.isEmpty()) {
-                    mProcessMap.remove(record.buid);
+                    mProcessMap.remove(key);
                 }
             }
             mPidsSelfLocked.remove(record);
@@ -225,7 +254,7 @@ public class BProcessManagerService implements ISystemService {
                 for (ProcessRecord processRecord : mPidsSelfLocked) {
                     int appId1 = BUserHandle.getAppId(processRecord.buid);
                     if (appId == appId1) {
-                        mProcessMap.remove(processRecord.buid);
+                        mProcessMap.remove(mapKey(processRecord));
                         tmp.remove(processRecord);
                         processRecord.kill();
                     }
@@ -271,6 +300,7 @@ public class BProcessManagerService implements ISystemService {
     public int getUserIdByCallingPid(int callingPid) {
         ProcessRecord callingProcess = findProcessByPid(callingPid);
         if (callingProcess == null) {
+            Slog.w(TAG, "getUserIdByCallingPid: unknown pid " + callingPid + ", assuming user 0");
             return 0;
         }
         return callingProcess.userId;
