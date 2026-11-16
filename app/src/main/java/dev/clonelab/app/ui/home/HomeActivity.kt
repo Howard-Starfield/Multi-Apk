@@ -20,6 +20,7 @@ import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
 import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.databinding.ActivityHomeBinding
+import dev.clonelab.app.keepalive.KeepAliveController
 import dev.clonelab.app.ui.AppVisuals
 import dev.clonelab.app.ui.add.AddCloneActivity
 import dev.clonelab.app.ui.detail.CloneDetailActivity
@@ -54,6 +55,7 @@ class HomeActivity : AppCompatActivity() {
         touchHelper.attachToRecyclerView(binding.list)
         binding.fab.setOnClickListener { startActivity(Intent(this, AddCloneActivity::class.java)) }
         binding.retry.setOnClickListener { viewModel.checkEngine() }
+        KeepAliveController.sync(applicationContext)
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {

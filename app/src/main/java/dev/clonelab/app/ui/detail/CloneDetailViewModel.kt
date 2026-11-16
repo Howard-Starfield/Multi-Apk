@@ -33,6 +33,8 @@ class CloneDetailViewModel(
     private val repository: CloneRepository,
     private val shortcuts: ShortcutPublisher,
     private val iconImages: IconImageStore,
+    /** Called after the stored keep-alive flags changed, so the service can start or stop. */
+    private val syncKeepAlive: () -> Unit = {},
 ) : ViewModel() {
 
     /** The clone's current state, or null once it has been removed. */
@@ -66,7 +68,15 @@ class CloneDetailViewModel(
         viewModelScope.launch {
             repository.remove(id)
             shortcuts.disable(id)
+            syncKeepAlive()
             events.send(DetailEvent.Closed)
+        }
+    }
+
+    fun setKeepAlive(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.update(id) { it.copy(keepAlive = enabled) }
+            syncKeepAlive()
         }
     }
 

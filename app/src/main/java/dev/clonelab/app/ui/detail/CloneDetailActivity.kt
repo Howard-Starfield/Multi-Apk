@@ -19,9 +19,12 @@ import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
 import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.databinding.ActivityCloneDetailBinding
+import dev.clonelab.app.keepalive.KeepAliveController
+import dev.clonelab.app.keepalive.KeepAlivePrefs
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.shortcut.ShortcutPublisher
 import dev.clonelab.app.ui.AppVisuals
+import dev.clonelab.app.ui.keepalive.KeepAliveGuideActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
@@ -41,6 +44,7 @@ class CloneDetailActivity : AppCompatActivity() {
                     ServiceLocator.repository(applicationContext),
                     ShortcutPublisher(applicationContext),
                     IconImageStore(applicationContext),
+                    syncKeepAlive = { KeepAliveController.sync(applicationContext) },
                 )
             }
         }
@@ -67,6 +71,14 @@ class CloneDetailActivity : AppCompatActivity() {
             ).show()
         }
         binding.addShortcut.setOnClickListener { viewModel.pinShortcut() }
+        binding.keepAlive.setOnClickListener {
+            val enabled = binding.keepAlive.isChecked
+            viewModel.setKeepAlive(enabled)
+            if (enabled && KeepAlivePrefs(this).consumeFirstTime()) {
+                startActivity(KeepAliveGuideActivity.intent(this))
+            }
+        }
+        binding.keepAliveGuide.setOnClickListener { startActivity(KeepAliveGuideActivity.intent(this)) }
         binding.stop.setOnClickListener { viewModel.stop() }
         binding.clearData.setOnClickListener { confirm(R.string.detail_clear_data_confirm, viewModel::clearData) }
         binding.uninstall.setOnClickListener { confirm(R.string.detail_uninstall_confirm, viewModel::remove) }
@@ -123,6 +135,7 @@ class CloneDetailActivity : AppCompatActivity() {
                 else -> R.string.detail_state_stopped
             },
         )
+        binding.keepAlive.isChecked = record.keepAlive
         binding.actions.visibility = if (item.installed) View.VISIBLE else View.GONE
         binding.remove.visibility = if (item.installed) View.GONE else View.VISIBLE
     }

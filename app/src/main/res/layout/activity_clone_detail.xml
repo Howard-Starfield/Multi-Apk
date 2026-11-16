@@ -72,6 +72,19 @@
             android:layout_height="wrap_content"
             android:text="@string/detail_add_shortcut" />
 
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/keepAlive"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/detail_keep_alive" />
+
+        <Button
+            android:id="@+id/keepAliveGuide"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/detail_keep_alive_guide" />
+
         <Button
             android:id="@+id/stop"
             style="@style/Widget.Material3.Button.TonalButton"

@@ -10,6 +10,7 @@ import java.io.File
 /** Builds the app's single engine and repository on first use, so clone processes never create them. */
 object ServiceLocator {
     private var engine: CloneEngine? = null
+    private var store: CloneStore? = null
     private var repository: CloneRepository? = null
 
     @Synchronized
@@ -17,10 +18,14 @@ object ServiceLocator {
         engine ?: BlackBoxCloneEngine().also { engine = it }
 
     @Synchronized
+    fun store(context: Context): CloneStore =
+        store ?: CloneStore(File(context.applicationContext.filesDir, "clones.json")).also { store = it }
+
+    @Synchronized
     fun repository(context: Context): CloneRepository =
         repository ?: CloneRepository(
             engine = engine(),
-            store = CloneStore(File(context.applicationContext.filesDir, "clones.json")),
+            store = store(context),
             clock = System::currentTimeMillis,
         ).also { repository = it }
 }

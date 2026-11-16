@@ -4,6 +4,12 @@
 
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:name=".CloneLabApp"
@@ -28,6 +34,24 @@
             android:name=".ui.detail.CloneDetailActivity"
             android:exported="false"
             android:label="@string/detail_title" />
+        <activity
+            android:name=".ui.keepalive.KeepAliveGuideActivity"
+            android:exported="false"
+            android:label="@string/guide_title" />
+
+        <service
+            android:name=".keepalive.KeepAliveService"
+            android:exported="false" />
+
+        <receiver
+            android:name=".keepalive.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".shortcut.ShortcutTrampolineActivity"
             android:exported="false"
