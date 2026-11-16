@@ -30,6 +30,12 @@ class BlackBoxCloneEngine : CloneEngine {
         val deadline = SystemClock.elapsedRealtime() + timeoutMs
         while (true) {
             if (isAvailable()) return true
+            // isAvailable() only looks at the binder the engine has cached. After the engine server
+            // restarts that binder is dead for good, so ask for something real: that makes the
+            // engine reconnect (and start the server if needed). Blocking is fine here; callers
+            // are never on the main thread.
+            safe(Unit) { core.isInstalled(core.hostPackageName, 0) }
+            if (isAvailable()) return true
             if (SystemClock.elapsedRealtime() >= deadline) return false
             try {
                 Thread.sleep(POLL_MS)
