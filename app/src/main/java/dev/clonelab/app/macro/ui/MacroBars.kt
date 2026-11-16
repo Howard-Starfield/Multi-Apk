@@ -118,7 +118,7 @@ internal class RecordingBar(
  * spot is top-centre and the bar can be dragged out of the way.
  */
 internal class PlayingBar(
-    host: OverlayHost,
+    private val host: OverlayHost,
     position: BarPosition,
     private val onStop: () -> Unit,
 ) {
@@ -135,8 +135,7 @@ internal class PlayingBar(
             counter = v.findViewById(R.id.counter)
             v.findViewById<View>(R.id.stop).setOnClickListener { onStop() }
         }
-        val total = if (repeatCount == 0) "∞" else repeatCount.toString()
-        val counterText = "${repeatIndex + 1}/$total"
+        val counterText = MacroFormat.runCounter(repeatIndex, repeatCount) { host.themed.getString(R.string.macro_playing_run, it) }
         var changed = false
         if (name?.text?.toString() != macroName) {
             name?.text = macroName

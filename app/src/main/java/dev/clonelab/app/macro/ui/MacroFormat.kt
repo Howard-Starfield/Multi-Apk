@@ -17,8 +17,8 @@ object MacroFormat {
     private const val FINE_STEP_MS = 100L
     private const val COARSE_STEP_MS = 500L
 
-    /** Values of the repeat stepper; 0 means "until stopped" and comes last. */
-    val REPEAT_VALUES = listOf(1, 2, 3, 5, 10, 20, 50, 100, 0)
+    /** Values of the repeat stepper. "Until stopped" is the separate Loop switch (repeat count 0). */
+    val REPEAT_VALUES = listOf(1, 2, 3, 5, 10, 20, 50, 100)
     val INTERVAL_MINUTES = listOf(1, 5, 10, 15, 30, 60, 120, 360, 720)
     private const val MINUTE_STEP = 5
 
@@ -70,21 +70,25 @@ object MacroFormat {
 
     /** Next value of [values] above/below [current]; stays put at either end. Off-list values snap to a neighbour. */
     fun stepList(values: List<Int>, current: Int, up: Boolean): Int {
-        val ordered = values.sortedBy { rank(it) }
-        val r = rank(current)
+        val ordered = values.sorted()
         return if (up) {
-            ordered.firstOrNull { rank(it) > r } ?: ordered.last()
+            ordered.firstOrNull { it > current } ?: ordered.last()
         } else {
-            ordered.lastOrNull { rank(it) < r } ?: ordered.first()
+            ordered.lastOrNull { it < current } ?: ordered.first()
         }
     }
-
-    /** 0 ("until stopped") ranks above every number. */
-    private fun rank(value: Int): Long = if (value == 0) Long.MAX_VALUE else value.toLong()
 
     fun stepRepeat(current: Int, up: Boolean): Int = stepList(REPEAT_VALUES, current, up)
 
     fun stepInterval(current: Int, up: Boolean): Int = stepList(INTERVAL_MINUTES, current, up)
+
+    /** Macro list line: "repeats 3x", or for a loop (count 0) "loops every 1.0 s". */
+    fun repeatSummary(repeatCount: Int, repeatDelayMs: Long, times: (Int) -> String, loops: (String) -> String): String =
+        if (repeatCount == 0) loops(formatSeconds(repeatDelayMs)) else times(repeatCount)
+
+    /** Playing bar counter: "2/10", or "run 5" for a loop (count 0). [repeatIndex] is zero-based. */
+    fun runCounter(repeatIndex: Int, repeatCount: Int, run: (Int) -> String): String =
+        if (repeatCount == 0) run(repeatIndex + 1) else "${repeatIndex + 1}/$repeatCount"
 
     /** Hours wrap around. */
     fun stepHour(hour: Int, up: Boolean): Int = Math.floorMod(hour + if (up) 1 else -1, 24)

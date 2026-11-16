@@ -19,6 +19,7 @@ import dev.clonelab.app.databinding.ItemKeepaliveStepBinding
 import dev.clonelab.app.keepalive.KeepAlivePrefs
 import dev.clonelab.app.keepalive.SetupFlow
 import dev.clonelab.app.keepalive.SetupStatusReader
+import dev.clonelab.app.keepalive.SetupStep
 import dev.clonelab.app.keepalive.VendorSettings
 
 /** Checklist of the phone settings that keep clones running in the background, with live status. */
@@ -39,6 +40,7 @@ class KeepAliveGuideActivity : AppCompatActivity() {
         setContentView(binding.root)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
+        bindStatic(binding.stepAppPermissions, R.string.guide_app_permissions_title, R.string.guide_app_permissions_text)
         bindStatic(binding.stepNotifications, R.string.guide_notifications_title, R.string.guide_notifications_text)
         bindStatic(binding.stepBattery, R.string.guide_battery_title, R.string.guide_battery_text)
         bindStatic(binding.stepOverlay, R.string.guide_overlay_title, R.string.guide_overlay_text)
@@ -55,6 +57,9 @@ class KeepAliveGuideActivity : AppCompatActivity() {
         }
         binding.fixAll.setOnClickListener { setupFlow.start() }
 
+        binding.stepAppPermissions.action.setOnClickListener {
+            if (SetupStatusReader.read(this).appPermissions) startFirst(listOf(appDetailsIntent())) else setupFlow.startOnly(SetupStep.APP_PERMISSIONS)
+        }
         binding.stepNotifications.action.setOnClickListener { askForNotifications() }
         binding.stepBattery.action.setOnClickListener { askToIgnoreBatteryOptimisations() }
         binding.stepOverlay.action.setOnClickListener { openOverlaySettings() }
@@ -78,6 +83,7 @@ class KeepAliveGuideActivity : AppCompatActivity() {
 
     private fun render() {
         val status = SetupStatusReader.read(this)
+        showStatus(binding.stepAppPermissions, status.appPermissions)
         showStatus(binding.stepNotifications, status.notifications)
         showStatus(binding.stepBattery, status.battery)
         showStatus(binding.stepOverlay, status.overlay)

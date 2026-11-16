@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
+import dev.clonelab.app.keepalive.SetupBanner
 import dev.clonelab.app.keepalive.SetupFlow
 import dev.clonelab.app.keepalive.SetupStatusReader
 import dev.clonelab.app.switcher.SwitcherPrefs
@@ -97,7 +98,14 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun renderSetupBanner() {
-        binding.setupBanner.visibility = if (SetupStatusReader.read(this).complete) View.GONE else View.VISIBLE
+        val banner = SetupStatusReader.read(this).banner()
+        binding.setupBanner.visibility = if (banner == null) View.GONE else View.VISIBLE
+        binding.setupBannerText.text = when (banner) {
+            SetupBanner.PERMISSIONS_ONLY -> getString(R.string.home_setup_banner_permissions)
+            SetupBanner.BACKGROUND_ONLY, null -> getString(R.string.home_setup_banner)
+            SetupBanner.BOTH ->
+                getString(R.string.home_setup_banner) + " " + getString(R.string.home_setup_banner_also)
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

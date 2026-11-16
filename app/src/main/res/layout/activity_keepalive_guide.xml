@@ -22,6 +22,10 @@
             android:text="@string/guide_fix_all" />
 
         <include
+            android:id="@+id/stepAppPermissions"
+            layout="@layout/item_keepalive_step" />
+
+        <include
             android:id="@+id/stepNotifications"
             layout="@layout/item_keepalive_step" />
 

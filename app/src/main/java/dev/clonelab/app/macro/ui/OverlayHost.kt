@@ -258,11 +258,12 @@ internal object MacroText {
     fun summary(context: Context, macro: Macro): String {
         val r = context.resources
         val parts = mutableListOf(r.getQuantityString(R.plurals.macro_summary_steps, macro.steps.size, macro.steps.size))
-        parts += if (macro.repeatCount == 0) {
-            r.getString(R.string.macro_summary_repeat_forever)
-        } else {
-            r.getString(R.string.macro_summary_repeat, macro.repeatCount)
-        }
+        parts += MacroFormat.repeatSummary(
+            macro.repeatCount,
+            macro.repeatDelayMs,
+            times = { r.getString(R.string.macro_summary_repeat, it) },
+            loops = { r.getString(R.string.macro_summary_loop, it) },
+        )
         when (val s = macro.schedule) {
             MacroSchedule.Off -> Unit
             is MacroSchedule.EveryMinutes -> parts += r.getString(R.string.macro_summary_every, s.minutes)

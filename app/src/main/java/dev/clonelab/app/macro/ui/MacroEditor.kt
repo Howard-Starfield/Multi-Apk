@@ -4,6 +4,7 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.view.ViewGroup
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -39,6 +40,8 @@ internal class MacroEditor(
     private var card: View? = null
     private var scroll: MaxHeightScrollView? = null
     private lateinit var steps: LinearLayout
+    private lateinit var loop: CheckBox
+    private lateinit var loopHint: TextView
     private lateinit var repeat: StepperView
     private lateinit var repeatDelay: StepperView
     private lateinit var interval: StepperView
@@ -105,6 +108,8 @@ internal class MacroEditor(
         })
 
         steps = v.findViewById(R.id.steps)
+        loop = v.findViewById(R.id.loop)
+        loopHint = v.findViewById(R.id.loopHint)
         repeat = v.findViewById(R.id.repeat)
         repeatDelay = v.findViewById(R.id.repeatDelay)
         interval = v.findViewById(R.id.interval)
@@ -114,6 +119,12 @@ internal class MacroEditor(
         note = v.findViewById(R.id.scheduleNote)
         discard = v.findViewById(R.id.discard)
 
+        loop.setOnCheckedChangeListener { _, checked ->
+            if (checked != draft.isLoop) {
+                update { it.withLoop(checked) }
+                showRepeat()
+            }
+        }
         repeat.onStep = { up ->
             update { it.withRepeat(MacroFormat.stepRepeat(it.repeatCount, up)) }
             showRepeat()
@@ -183,13 +194,10 @@ internal class MacroEditor(
     }
 
     private fun showRepeat() {
-        repeat.setValue(
-            if (draft.repeatCount == 0) {
-                host.themed.getString(R.string.macro_repeat_forever)
-            } else {
-                host.themed.getString(R.string.macro_repeat_value, draft.repeatCount)
-            },
-        )
+        if (loop.isChecked != draft.isLoop) loop.isChecked = draft.isLoop
+        loopHint.visibility = if (draft.isLoop) View.VISIBLE else View.GONE
+        repeat.visibility = if (draft.isLoop) View.GONE else View.VISIBLE
+        if (!draft.isLoop) repeat.setValue(host.themed.getString(R.string.macro_repeat_value, draft.repeatCount))
         repeatDelay.setValue(MacroFormat.formatSeconds(draft.repeatDelayMs), draft.repeatDelayMs)
     }
 

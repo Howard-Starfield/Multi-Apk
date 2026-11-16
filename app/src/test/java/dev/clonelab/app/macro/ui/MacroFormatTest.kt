@@ -72,15 +72,31 @@ class MacroFormatTest {
     }
 
     @Test
-    fun repeatStepperWalksTheListAndEndsAtUntilStopped() {
+    fun repeatStepperWalksTheFiniteListAndStopsAtEnds() {
         assertEquals(2, MacroFormat.stepRepeat(1, up = true))
         assertEquals(100, MacroFormat.stepRepeat(50, up = true))
-        assertEquals(0, MacroFormat.stepRepeat(100, up = true))
-        assertEquals(0, MacroFormat.stepRepeat(0, up = true))
-        assertEquals(100, MacroFormat.stepRepeat(0, up = false))
+        assertEquals(100, MacroFormat.stepRepeat(100, up = true))
+        assertEquals(false, MacroFormat.REPEAT_VALUES.contains(0))
         assertEquals(1, MacroFormat.stepRepeat(1, up = false))
         assertEquals(5, MacroFormat.stepRepeat(4, up = true))
         assertEquals(3, MacroFormat.stepRepeat(4, up = false))
+    }
+
+    @Test
+    fun repeatSummaryShowsLoopWithItsDelay() {
+        val times = { n: Int -> "repeats $n\u00d7" }
+        val loops = { s: String -> "loops every $s" }
+        assertEquals("repeats 3\u00d7", MacroFormat.repeatSummary(3, 1000, times, loops))
+        assertEquals("loops every 1.0 s", MacroFormat.repeatSummary(0, 1000, times, loops))
+        assertEquals("loops every 2.5 s", MacroFormat.repeatSummary(0, 2500, times, loops))
+    }
+
+    @Test
+    fun runCounterShowsRunNumberForLoopsAndProgressOtherwise() {
+        val run = { n: Int -> "run $n" }
+        assertEquals("2/10", MacroFormat.runCounter(1, 10, run))
+        assertEquals("run 5", MacroFormat.runCounter(4, 0, run))
+        assertEquals("run 1", MacroFormat.runCounter(0, 0, run))
     }
 
     @Test

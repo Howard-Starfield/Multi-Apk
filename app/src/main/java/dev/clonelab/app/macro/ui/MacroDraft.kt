@@ -21,7 +21,11 @@ data class MacroDraft(
     val repeatDelayMs: Long = 1000,
     val schedule: MacroSchedule = MacroSchedule.Off,
     val createdAt: Long,
+    /** The last finite repeat count, so switching Loop off again restores it. */
+    val lastFiniteRepeat: Int = 1,
 ) {
+    val isLoop: Boolean get() = repeatCount == 0
+
     fun withName(value: String) = copy(name = value)
 
     fun withStepDelay(index: Int, ms: Long): MacroDraft {
@@ -33,8 +37,18 @@ data class MacroDraft(
     fun withoutStep(index: Int): MacroDraft =
         if (index !in steps.indices) this else copy(steps = steps.filterIndexed { i, _ -> i != index })
 
-    /** 0 means until stopped. */
-    fun withRepeat(count: Int) = copy(repeatCount = count.coerceAtLeast(0))
+    /** 0 means until stopped (see [withLoop]); a positive count is remembered as the last finite one. */
+    fun withRepeat(count: Int): MacroDraft {
+        val value = count.coerceAtLeast(0)
+        return copy(repeatCount = value, lastFiniteRepeat = if (value > 0) value else lastFiniteRepeat)
+    }
+
+    /** Loop on = repeat until stopped (count 0); off = back to the last finite count the user had. */
+    fun withLoop(on: Boolean): MacroDraft = when {
+        on -> copy(repeatCount = 0)
+        isLoop -> copy(repeatCount = lastFiniteRepeat.coerceAtLeast(1))
+        else -> this
+    }
 
     fun withRepeatDelay(ms: Long) = copy(repeatDelayMs = ms.coerceIn(0, MacroFormat.MAX_DELAY_MS))
 
@@ -85,6 +99,7 @@ data class MacroDraft(
             repeatDelayMs = macro.repeatDelayMs,
             schedule = macro.schedule,
             createdAt = macro.createdAt,
+            lastFiniteRepeat = if (macro.repeatCount > 0) macro.repeatCount else 1,
         )
 
         fun recorded(

@@ -34,6 +34,22 @@ class SetupFlow(
     private val attempted = mutableSetOf<SetupStep>()
     private var active = false
 
+    /** Set when only one step was asked for (a row of the guide); null walks through everything missing. */
+    private var only: SetupStep? = null
+
+    private val clonePermissions = activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (!active) return@registerForActivityResult
+        // Still denied and the system will not ask again (or showed no prompt at all): offer the settings page once.
+        val stuck = SetupStatusReader.missingClonePermissions(activity)
+            .filterNot { activity.shouldShowRequestPermissionRationale(it) }
+        if (stuck.isNotEmpty()) {
+            toast(R.string.setup_toast_app_permissions)
+            launchFirst()
+        } else {
+            advance()
+        }
+    }
+
     private val permission = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!active) return@registerForActivityResult
         // Denied and the system will not ask again (or showed no prompt at all): offer the settings page once.
@@ -46,9 +62,15 @@ class SetupFlow(
 
     val isRunning: Boolean get() = active
 
-    fun start() {
+    fun start() = begin(null)
+
+    /** Runs just [step] (if it is still missing), then finishes. */
+    fun startOnly(step: SetupStep) = begin(step)
+
+    private fun begin(step: SetupStep?) {
         if (active) return
         attempted.clear()
+        only = step
         active = true
         advance()
     }
@@ -67,13 +89,14 @@ class SetupFlow(
 
     private fun next() {
         val status = SetupStatusReader.read(activity)
-        val step = status.missing().firstOrNull { it !in attempted }
+        val step = status.missing().firstOrNull { it !in attempted && (only == null || it == only) }
         if (step == null) {
             finish(status)
             return
         }
         attempted += step
         when (step) {
+            SetupStep.APP_PERMISSIONS -> askClonePermissions()
             SetupStep.NOTIFICATIONS -> askNotifications()
             SetupStep.BATTERY -> {
                 toast(R.string.setup_toast_battery)
@@ -95,6 +118,17 @@ class SetupFlow(
                 }
                 launchFirst(*vendor.toTypedArray())
             }
+        }
+    }
+
+    private fun askClonePermissions() {
+        val missing = SetupStatusReader.missingClonePermissions(activity)
+        try {
+            clonePermissions.launch(missing.toTypedArray())
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "Permission prompt failed", e)
+            toast(R.string.setup_toast_app_permissions)
+            launchFirst()
         }
     }
 

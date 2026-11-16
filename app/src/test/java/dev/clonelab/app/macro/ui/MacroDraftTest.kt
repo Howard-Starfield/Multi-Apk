@@ -57,6 +57,33 @@ class MacroDraftTest {
     }
 
     @Test
+    fun loopOnMeansCountZeroAndOffRestoresTheLastFiniteCount() {
+        val five = draft.withRepeat(5)
+        val looping = five.withLoop(true)
+        assertEquals(0, looping.repeatCount)
+        assertEquals(true, looping.isLoop)
+        assertEquals(5, looping.withLoop(false).repeatCount)
+        assertEquals(five, looping.withLoop(false))
+        // Stays on while on, and off is a no-op while off.
+        assertEquals(looping, looping.withLoop(true))
+        assertEquals(five, five.withLoop(false))
+        // Off with nothing remembered falls back to 1.
+        assertEquals(1, draft.withLoop(true).withLoop(false).repeatCount)
+    }
+
+    @Test
+    fun loopKeepsTheRepeatDelayAndAStoredZeroOpensWithLoopOn() {
+        val looping = draft.withRepeatDelay(2500).withLoop(true)
+        assertEquals(2500L, looping.repeatDelayMs)
+        val reopened = MacroDraft.fromMacro(looping.toMacro(null, 0, null))
+        assertEquals(true, reopened.isLoop)
+        assertEquals(1, reopened.withLoop(false).repeatCount)
+        val storedFive = MacroDraft.fromMacro(draft.withRepeat(7).toMacro(null, 0, null))
+        assertEquals(false, storedFive.isLoop)
+        assertEquals(7, storedFive.withLoop(true).withLoop(false).repeatCount)
+    }
+
+    @Test
     fun problemsAreReported() {
         assertNull(draft.problem())
         assertEquals(DraftProblem.BLANK_NAME, draft.withName("   ").problem())

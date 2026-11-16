@@ -78,6 +78,25 @@
                     android:textStyle="bold"
                     android:text="@string/macro_repeat_label" />
 
+                <CheckBox
+                    android:id="@+id/loop"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/macro_loop_label"
+                    android:textColor="@color/white"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/loopHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/macro_loop_hint"
+                    android:textColor="@color/macro_text_dim"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+
                 <dev.clonelab.app.macro.ui.StepperView
                     android:id="@+id/repeat"
                     android:layout_width="wrap_content"
