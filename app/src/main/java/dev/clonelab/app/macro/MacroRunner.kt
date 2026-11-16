@@ -158,7 +158,12 @@ class MacroRunner(
 
     /** @return null when [target] is in front, else the result to finish with. */
     private suspend fun ensureFocused(target: CloneId): PlayResult? {
-        if (engine.focusedClone() == target) return null
+        if (engine.focusedClone() == target) {
+            // The panel or editor that started this run is still closing; a step fired now would
+            // land on that window instead of the clone.
+            delay(SETTLE_BEFORE_FIRST_STEP_MS)
+            return null
+        }
         launchClone(target).onFailure { return PlayResult.Refused(it.message ?: "The app could not be launched") }
         val deadline = System.nanoTime() + FOCUS_WAIT_MS * 1_000_000
         while (System.nanoTime() < deadline) {
@@ -203,6 +208,7 @@ class MacroRunner(
         const val FOCUS_WAIT_MS = 8_000L
         const val FOCUS_POLL_MS = 250L
         const val SETTLE_AFTER_LAUNCH_MS = 600L
+        const val SETTLE_BEFORE_FIRST_STEP_MS = 450L
         const val FOCUS_RECHECKS = 4
         const val FOCUS_RECHECK_MS = 150L
     }

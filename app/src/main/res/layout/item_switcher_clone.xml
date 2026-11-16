@@ -1,42 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="40dp"
-    android:layout_height="40dp">
+    android:layout_width="56dp"
+    android:layout_height="54dp">
 
     <FrameLayout
-        android:id="@+id/ring"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_gravity="center">
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="top|center_horizontal">
 
-        <ImageView
-            android:id="@+id/icon"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="3dp"
-            android:importantForAccessibility="no" />
+        <FrameLayout
+            android:id="@+id/ring"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center">
+
+            <ImageView
+                android:id="@+id/icon"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:padding="3dp"
+                android:importantForAccessibility="no" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/badge"
+            android:layout_width="wrap_content"
+            android:layout_height="14dp"
+            android:layout_gravity="bottom|end"
+            android:background="@drawable/bg_switcher_badge"
+            android:gravity="center"
+            android:minWidth="14dp"
+            android:paddingStart="3dp"
+            android:paddingEnd="3dp"
+            android:textColor="@color/white"
+            android:textSize="9sp"
+            android:textStyle="bold" />
+
+        <View
+            android:id="@+id/runningDot"
+            android:layout_width="9dp"
+            android:layout_height="9dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="1dp"
+            android:layout_marginEnd="1dp"
+            android:background="@drawable/bg_running_dot" />
     </FrameLayout>
 
+    <!-- The clone's name, so the user does not have to remember numbers. -->
     <TextView
-        android:id="@+id/badge"
-        android:layout_width="wrap_content"
-        android:layout_height="14dp"
-        android:layout_gravity="bottom|end"
-        android:background="@drawable/bg_switcher_badge"
+        android:id="@+id/name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:ellipsize="end"
         android:gravity="center"
-        android:minWidth="14dp"
-        android:paddingStart="3dp"
-        android:paddingEnd="3dp"
-        android:textColor="@color/white"
-        android:textSize="9sp"
-        android:textStyle="bold" />
-
-    <View
-        android:id="@+id/runningDot"
-        android:layout_width="9dp"
-        android:layout_height="9dp"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="1dp"
-        android:layout_marginEnd="1dp"
-        android:background="@drawable/bg_running_dot" />
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:paddingStart="1dp"
+        android:paddingEnd="1dp"
+        android:paddingBottom="2dp"
+        android:textColor="#E6FFFFFF"
+        android:textSize="9sp" />
 </FrameLayout>

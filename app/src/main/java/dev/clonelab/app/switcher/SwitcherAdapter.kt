@@ -34,6 +34,8 @@ class SwitcherAdapter(
         val item = items[position]
         holder.icon.setImageDrawable(icons[item.id])
         holder.badge.text = item.number.toString()
+        holder.name.text = item.label
+        holder.name.alpha = if (item.state == SwitcherState.IDLE) IDLE_NAME_ALPHA else 1f
         holder.itemView.contentDescription = item.label
         holder.ring.setBackgroundResource(if (item.state == SwitcherState.FOCUSED) R.drawable.bg_switcher_ring else 0)
         holder.dot.visibility = if (item.state == SwitcherState.RUNNING) View.VISIBLE else View.GONE
@@ -49,9 +51,11 @@ class SwitcherAdapter(
         val icon: ImageView = view.findViewById(R.id.icon)
         val badge: TextView = view.findViewById(R.id.badge)
         val dot: View = view.findViewById(R.id.runningDot)
+        val name: TextView = view.findViewById(R.id.name)
     }
 
     private companion object {
         const val IDLE_ALPHA = 0.45f
+        const val IDLE_NAME_ALPHA = 0.7f
     }
 }

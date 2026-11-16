@@ -399,7 +399,7 @@ class SwitcherOverlay(
     private companion object {
         const val TAG = "SwitcherOverlay"
         const val COLUMNS = 2
-        const val ROW_DP = 40
+        const val ROW_DP = 54
         const val TAB_COLOR = 0x661C1B1F // slim and see-through: it sits on top of the clone
         const val GRIP_COLOR = 0xCCFFFFFF.toInt()
         const val EXPAND_MS = 200L
