@@ -5,6 +5,7 @@ import dev.clonelab.app.model.CloneRecord
 import dev.clonelab.app.model.DeviceProfile
 import dev.clonelab.app.model.IconKind
 import dev.clonelab.app.model.LocationConfig
+import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -36,21 +37,60 @@ class CloneStore(private val file: File) {
         write((listed + rest).mapIndexed { index, record -> record.copy(sortOrder = index) })
     }
 
+    private val tempFile get() = File(file.absolutePath + ".tmp")
+
+    /**
+     * Never throws and never silently discards data: a bad record is skipped (and logged), an
+     * unparseable file is moved aside to `<name>.corrupt`, and a missing file is recovered from the
+     * `.tmp` left by an interrupted write.
+     */
     private fun read(): List<CloneRecord> {
-        if (!file.exists()) return emptyList()
-        return try {
-            val array = JSONObject(file.readText()).getJSONArray(KEY_CLONES)
-            (0 until array.length()).map { recordFromJson(array.getJSONObject(it)) }
-                .sortedWith(compareBy({ it.sortOrder }, { it.createdAt }))
+        if (file.exists()) {
+            val parsed = parseFile(file)
+            if (parsed != null) return parsed
+            moveAside()
+        }
+        return tempFile.takeIf { it.exists() }?.let(::parseFile) ?: emptyList()
+    }
+
+    /** @return the records, or null when the file as a whole cannot be parsed. */
+    private fun parseFile(source: File): List<CloneRecord>? {
+        val array = try {
+            JSONObject(source.readText()).getJSONArray(KEY_CLONES)
         } catch (e: Exception) {
-            emptyList()
+            Log.w(TAG, "Cannot parse ${source.name}", e)
+            return null
+        }
+        val records = (0 until array.length()).mapNotNull { index ->
+            try {
+                recordFromJson(array.getJSONObject(index))
+            } catch (e: Exception) {
+                Log.w(TAG, "Skipping unreadable clone record #$index", e)
+                null
+            }
+        }
+        return records.sortedWith(compareBy({ it.sortOrder }, { it.createdAt }))
+    }
+
+    private fun moveAside() {
+        try {
+            var target = File(file.absolutePath + ".corrupt")
+            var n = 1
+            while (target.exists()) target = File(file.absolutePath + ".corrupt.${n++}")
+            if (!file.renameTo(target)) {
+                file.copyTo(target)
+                file.delete()
+            }
+            Log.w(TAG, "Moved unreadable ${file.name} to ${target.name}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not move ${file.name} aside", e)
         }
     }
 
     private fun write(records: List<CloneRecord>) {
         val json = JSONObject().put(KEY_CLONES, JSONArray(records.map(::recordToJson)))
         file.absoluteFile.parentFile?.mkdirs()
-        val temp = File(file.absolutePath + ".tmp")
+        val temp = tempFile
         temp.writeText(json.toString())
         if (!temp.renameTo(file)) {
             // Some file systems refuse to rename over an existing file.
@@ -72,19 +112,21 @@ class CloneStore(private val file: File) {
         .put("location", r.location?.let(::locationToJson) ?: JSONObject.NULL)
         .put("deviceProfile", r.deviceProfile?.let(::profileToJson) ?: JSONObject.NULL)
         .put("createdAt", r.createdAt)
+        .put("iconVersion", r.iconVersion)
 
     private fun recordFromJson(o: JSONObject) = CloneRecord(
         id = CloneId(o.getString("packageName"), o.getInt("userId")),
         appLabel = o.getString("appLabel"),
         customName = o.optStringOrNull("customName"),
         sortOrder = o.getInt("sortOrder"),
-        iconKind = IconKind.valueOf(o.getString("iconKind")),
+        iconKind = runCatching { IconKind.valueOf(o.getString("iconKind")) }.getOrDefault(IconKind.APP),
         iconColor = o.getInt("iconColor"),
         iconImagePath = o.optStringOrNull("iconImagePath"),
         keepAlive = o.getBoolean("keepAlive"),
         location = if (o.isNull("location")) null else locationFromJson(o.getJSONObject("location")),
         deviceProfile = if (o.isNull("deviceProfile")) null else profileFromJson(o.getJSONObject("deviceProfile")),
         createdAt = o.getLong("createdAt"),
+        iconVersion = o.optLong("iconVersion", 0L),
     )
 
     private fun locationToJson(l: LocationConfig) = JSONObject()
@@ -127,6 +169,7 @@ class CloneStore(private val file: File) {
     private fun JSONObject.optStringOrNull(key: String): String? = if (isNull(key)) null else getString(key)
 
     private companion object {
+        const val TAG = "CloneStore"
         const val KEY_CLONES = "clones"
     }
 }

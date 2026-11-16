@@ -96,4 +96,57 @@ class CloneStoreTest {
         store.remove(CloneId("a", 0))
         assertEquals(listOf(CloneId("a", 1)), CloneStore(file()).all().map { it.id })
     }
+
+    @Test
+    fun oneBadRecordAmongGoodOnesIsSkipped() {
+        val store = CloneStore(file())
+        store.put(record("a", 0, 0))
+        store.put(record("b", 0, 1))
+        val json = org.json.JSONObject(file().readText())
+        json.getJSONArray("clones").put(1, org.json.JSONObject().put("packageName", "broken"))
+        file().writeText(json.toString())
+
+        assertEquals(listOf("a"), CloneStore(file()).all().map { it.id.packageName })
+        // A later write keeps the good records and drops only the bad one.
+        CloneStore(file()).put(record("c", 0, 2))
+        assertEquals(listOf("a", "c"), CloneStore(file()).all().map { it.id.packageName })
+        assertTrue(!File(folder.root, "clones.json.corrupt").exists())
+    }
+
+    @Test
+    fun unknownIconKindFallsBackToDefault() {
+        val store = CloneStore(file())
+        store.put(record("a", 0, 0).copy(iconKind = IconKind.TEXT))
+        file().writeText(file().readText().replace("\"TEXT\"", "\"HOLOGRAM\""))
+        assertEquals(IconKind.APP, CloneStore(file()).get(CloneId("a", 0))!!.iconKind)
+    }
+
+    @Test
+    fun corruptFileIsPreservedAsCorrupt() {
+        file().writeText("{ not json")
+        val store = CloneStore(file())
+        assertTrue(store.all().isEmpty())
+        store.put(record("a", 0, 0))
+        assertEquals("{ not json", File(folder.root, "clones.json.corrupt").readText())
+        assertEquals(1, CloneStore(file()).all().size)
+    }
+
+    @Test
+    fun recoversFromTmpWhenMainFileIsMissing() {
+        CloneStore(file()).put(record("a", 0, 0))
+        assertTrue(file().renameTo(File(folder.root, "clones.json.tmp")))
+
+        assertEquals(listOf(CloneId("a", 0)), CloneStore(file()).all().map { it.id })
+    }
+
+    @Test
+    fun iconVersionRoundTripsAndDefaultsToZero() {
+        val store = CloneStore(file())
+        store.put(record("a", 0, 0).copy(iconVersion = 5))
+        assertEquals(5L, store.get(CloneId("a", 0))!!.iconVersion)
+        val json = org.json.JSONObject(file().readText())
+        json.getJSONArray("clones").getJSONObject(0).remove("iconVersion")
+        file().writeText(json.toString())
+        assertEquals(0L, CloneStore(file()).get(CloneId("a", 0))!!.iconVersion)
+    }
 }

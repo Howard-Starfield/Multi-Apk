@@ -5,6 +5,7 @@ import dev.clonelab.app.data.CloneRepository
 import dev.clonelab.app.data.CloneStore
 import dev.clonelab.app.engine.BlackBoxCloneEngine
 import dev.clonelab.app.engine.CloneEngine
+import dev.clonelab.app.keepalive.ManualStops
 import java.io.File
 
 /** Builds the app's single engine and repository on first use, so clone processes never create them. */
@@ -22,10 +23,12 @@ object ServiceLocator {
         store ?: CloneStore(File(context.applicationContext.filesDir, "clones.json")).also { store = it }
 
     @Synchronized
-    fun repository(context: Context): CloneRepository =
-        repository ?: CloneRepository(
+    fun repository(context: Context): CloneRepository {
+        ManualStops.install(context)
+        return repository ?: CloneRepository(
             engine = engine(),
             store = store(context),
             clock = System::currentTimeMillis,
         ).also { repository = it }
+    }
 }

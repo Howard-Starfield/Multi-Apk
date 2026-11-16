@@ -14,7 +14,11 @@ class FakeCloneEngine : CloneEngine {
     var installError: String? = null
     var apkPackage = "com.example.fromapk"
 
-    override fun awaitReady(timeoutMs: Long) = true
+    /** When false the fake behaves like a dead engine server: queries read as empty, usedUserIds throws. */
+    var available = true
+
+    override fun awaitReady(timeoutMs: Long) = available
+    override fun isAvailable() = available
 
     override fun installFromInstalledApp(packageName: String, userId: Int): EngineResult {
         installError?.let { return EngineResult.Error(it) }
@@ -29,11 +33,23 @@ class FakeCloneEngine : CloneEngine {
         return EngineResult.Ok
     }
 
-    override fun usedUserIds(packageName: String) =
-        installed.filter { it.packageName == packageName }.map { it.userId }.toSet()
+    override fun usedUserIds(packageName: String): Set<Int> {
+        check(available) { "engine unavailable" }
+        return installed.filter { it.packageName == packageName }.map { it.userId }.toSet()
+    }
 
-    override fun isInstalled(id: CloneId) = id in installed
-    override fun isRunning(id: CloneId) = id in running
+    /** Users the engine has beyond the installed clones, e.g. an orphan left by an earlier failure. */
+    val extraUsers = mutableSetOf<Int>()
+    override fun existingUserIds(): Set<Int> {
+        check(available) { "engine unavailable" }
+        return installed.map { it.userId }.toSet() + extraUsers
+    }
+
+    /** Ids whose uninstall silently does nothing. */
+    val stuck = mutableSetOf<CloneId>()
+
+    override fun isInstalled(id: CloneId) = available && id in installed
+    override fun isRunning(id: CloneId) = available && id in running
 
     override fun launch(id: CloneId): EngineResult {
         calls += "launch"
@@ -51,6 +67,7 @@ class FakeCloneEngine : CloneEngine {
 
     override fun uninstall(id: CloneId) {
         calls += "uninstall"
+        if (id in stuck) return
         installed -= id
         running -= id
     }

@@ -11,12 +11,22 @@ sealed interface EngineResult {
 
 /** The only view of the virtualization engine the rest of the app has. Calls block. */
 interface CloneEngine {
+    /** Polls until the engine server answers, or [timeoutMs] passed. */
     fun awaitReady(timeoutMs: Long): Boolean
+
+    /** Cheap, non-waiting check that the engine server is reachable right now. */
+    fun isAvailable(): Boolean
+
     fun installFromInstalledApp(packageName: String, userId: Int): EngineResult
 
     /** @return Ok plus the installed package name through [onPackage]. */
     fun installFromApk(apkUri: String, userId: Int, onPackage: (String) -> Unit): EngineResult
+
+    /** @throws IllegalStateException when the engine is unavailable: an empty set must mean "none used". */
     fun usedUserIds(packageName: String): Set<Int>
+
+    /** Every virtual user id the engine knows, whatever package. @throws IllegalStateException when unavailable. */
+    fun existingUserIds(): Set<Int>
     fun isInstalled(id: CloneId): Boolean
     fun isRunning(id: CloneId): Boolean
     fun launch(id: CloneId): EngineResult

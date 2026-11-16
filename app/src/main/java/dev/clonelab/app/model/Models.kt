@@ -25,6 +25,7 @@ data class CloneRecord(
     val location: LocationConfig? = null,
     val deviceProfile: DeviceProfile? = null,
     val createdAt: Long,
+    val iconVersion: Long = 0,       // bumped on every icon change so equal-looking records still rebind
 ) {
     val number: Int get() = id.userId + 1
     val displayName: String get() = customName ?: "$appLabel $number"

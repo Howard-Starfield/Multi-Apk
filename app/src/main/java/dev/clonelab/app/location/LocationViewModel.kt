@@ -13,10 +13,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import dev.clonelab.app.ui.launchGuarded
 
 sealed interface LocationEvent {
     data object Saved : LocationEvent
+    data class Failed(val message: String) : LocationEvent
     data class Invalid(val problem: CoordinateProblem) : LocationEvent
 }
 
@@ -34,7 +36,7 @@ class LocationViewModel(
     val messages: Flow<LocationEvent> = events.receiveAsFlow()
 
     init {
-        viewModelScope.launch { repository.refresh() }
+        guarded { repository.refreshWhenReady() }
     }
 
     /**
@@ -51,13 +53,17 @@ class LocationViewModel(
             }
             else -> null
         }
-        viewModelScope.launch {
+        guarded {
             repository.update(id) { it.copy(location = config) }
             events.send(LocationEvent.Saved)
         }
     }
 
     fun stopNow() {
-        viewModelScope.launch { repository.stop(id) }
+        guarded { repository.stop(id) }
+    }
+
+    private fun guarded(block: suspend CoroutineScope.() -> Unit) {
+        launchGuarded({ events.send(LocationEvent.Failed(it)) }, block)
     }
 }

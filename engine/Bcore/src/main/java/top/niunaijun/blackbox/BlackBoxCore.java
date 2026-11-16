@@ -1687,6 +1687,21 @@ public class BlackBoxCore extends ClientConfiguration {
         return mServicesInitialized;
     }
 
+    /**
+     * True iff the engine server (:black) hands out a live package manager binder right now.
+     * Unlike {@link #isServicesAvailable()} this is not a one-way flag: it is false when the
+     * server process is unreachable or has died.
+     */
+    public boolean isEngineAlive() {
+        try {
+            IBinder binder = getService(ServiceManager.PACKAGE_MANAGER);
+            return binder != null && binder.isBinderAlive() && binder.pingBinder();
+        } catch (Throwable e) {
+            Slog.w(TAG, "isEngineAlive failed: " + e.getMessage());
+            return false;
+        }
+    }
+
     
     public boolean isBlackBoxApp(File apkFile) {
         try {

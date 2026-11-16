@@ -172,4 +172,118 @@ class CloneRepositoryTest {
         assertEquals("A 1", store.get(first.id)!!.displayName)
         assertEquals(listOf(second.id, first.id), repository.clones.value.map { it.record.id })
     }
+
+    // --- engine availability ---
+
+    @Test
+    fun unavailableEngineKeepsPreviousStateOnRefresh() = runTest {
+        setUp()
+        val id = repository.addFromInstalledApp("com.a", "A").getOrThrow().id
+        repository.launch(id)
+        assertTrue(repository.clones.value.single().running)
+
+        engine.available = false
+        repository.refresh()
+
+        val item = repository.clones.value.single()
+        assertTrue(item.installed)
+        assertTrue(item.running)
+        assertFalse(repository.engineAvailable.value)
+
+        engine.available = true
+        repository.refresh()
+        assertTrue(repository.engineAvailable.value)
+    }
+
+    @Test
+    fun unavailableEngineDefaultsUnknownClonesToInstalled() = runTest {
+        setUp()
+        repository.addFromInstalledApp("com.a", "A")
+        val fresh = CloneRepository(engine, store) { 42L }
+        engine.available = false
+        fresh.refresh()
+        assertTrue(fresh.clones.value.single().installed)
+        assertFalse(fresh.clones.value.single().running)
+    }
+
+    @Test
+    fun addFailsWhileEngineUnavailable() = runTest {
+        setUp()
+        engine.available = false
+        assertTrue(repository.addFromInstalledApp("com.a", "A").isFailure)
+        assertTrue(repository.addFromApk("content://apk", "x").isFailure)
+        assertTrue(store.all().isEmpty())
+        assertTrue(engine.installed.isEmpty())
+    }
+
+    @Test
+    fun removeAndClearDataFailWhileEngineUnavailableAndKeepRecord() = runTest {
+        setUp()
+        val id = repository.addFromInstalledApp("com.a", "A").getOrThrow().id
+        engine.available = false
+
+        assertTrue(repository.remove(id).isFailure)
+        assertTrue(repository.clearData(id).isFailure)
+
+        assertEquals(1, store.all().size)
+        assertFalse(engine.calls.contains("uninstall"))
+        assertFalse(engine.calls.contains("clearData"))
+    }
+
+    // --- remove / add safety ---
+
+    @Test
+    fun removeKeepsRecordWhenCloneIsStillInEngine() = runTest {
+        setUp()
+        val id = repository.addFromInstalledApp("com.a", "A").getOrThrow().id
+        engine.stuck += id
+
+        val result = repository.remove(id)
+
+        assertTrue(result.isFailure)
+        assertEquals(1, store.all().size)
+    }
+
+    @Test
+    fun brokenRecordIsRemovedWithoutUninstall() = runTest {
+        setUp()
+        val id = repository.addFromInstalledApp("com.a", "A").getOrThrow().id
+        engine.installed.clear()
+
+        assertTrue(repository.remove(id).isSuccess)
+        assertTrue(store.all().isEmpty())
+        assertFalse(engine.calls.contains("uninstall"))
+    }
+
+    @Test
+    fun removeClearsManualStop() = runTest {
+        ManualStops.clearAll()
+        setUp()
+        val id = repository.addFromInstalledApp("com.a", "A").getOrThrow().id
+        repository.stop(id)
+        repository.remove(id)
+        assertFalse(ManualStops.contains(id))
+    }
+
+    @Test
+    fun storeFailureAfterInstallUninstallsAndFails() = runTest {
+        // A directory where the temp file must go makes every write throw.
+        File(folder.root, "clones.json.tmp").mkdirs()
+        store = CloneStore(File(folder.root, "clones.json"))
+        repository = CloneRepository(engine, store) { 42L }
+
+        val result = repository.addFromInstalledApp("com.a", "A")
+
+        assertTrue(result.isFailure)
+        assertTrue(engine.installed.isEmpty())
+        assertEquals(listOf("uninstall"), engine.calls)
+    }
+
+    @Test
+    fun apkCloneNeverReusesAnIdTheEngineAlreadyKnows() = runTest {
+        setUp()
+        engine.extraUsers += 0
+        val record = repository.addFromApk("content://apk", "x").getOrThrow()
+        assertEquals(1, record.id.userId)
+    }
 }

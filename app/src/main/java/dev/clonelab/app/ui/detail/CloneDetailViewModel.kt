@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import dev.clonelab.app.ui.launchGuarded
 
 sealed interface DetailEvent {
     data class Error(val message: String) : DetailEvent
@@ -48,35 +50,41 @@ class CloneDetailViewModel(
     val messages: Flow<DetailEvent> = events.receiveAsFlow()
 
     fun refresh() {
-        viewModelScope.launch { repository.refresh() }
+        guarded { repository.refreshWhenReady() }
     }
 
     fun launch() {
-        viewModelScope.launch {
+        guarded {
             repository.launch(id).onFailure { events.send(DetailEvent.Error(it.message ?: "Launch failed.")) }
         }
     }
 
     fun stop() {
-        viewModelScope.launch { repository.stop(id) }
+        guarded { repository.stop(id) }
     }
 
     fun clearData() {
-        viewModelScope.launch { repository.clearData(id) }
+        guarded {
+            repository.clearData(id).onFailure { events.send(DetailEvent.Error(it.message ?: "Clear data failed.")) }
+        }
     }
 
     /** Uninstalls the clone and forgets it; also used to remove a broken record. */
     fun remove() {
-        viewModelScope.launch {
-            repository.remove(id)
-            shortcuts.disable(id)
-            syncKeepAlive()
-            events.send(DetailEvent.Closed)
+        guarded {
+            repository.remove(id).fold(
+                onSuccess = {
+                    shortcuts.disable(id)
+                    syncKeepAlive()
+                    events.send(DetailEvent.Closed)
+                },
+                onFailure = { events.send(DetailEvent.Error(it.message ?: "Remove failed.")) },
+            )
         }
     }
 
     fun setKeepAlive(enabled: Boolean) {
-        viewModelScope.launch {
+        guarded {
             repository.update(id) { it.copy(keepAlive = enabled) }
             syncKeepAlive()
         }
@@ -88,31 +96,32 @@ class CloneDetailViewModel(
     }
 
     fun useAppIcon() {
-        edit { it.copy(iconKind = IconKind.APP, iconImagePath = null) }
+        edit { it.copy(iconKind = IconKind.APP, iconImagePath = null, iconVersion = it.iconVersion + 1) }
         deleteImage()
     }
 
     fun useTextIcon(color: Int) {
-        edit { it.copy(iconKind = IconKind.TEXT, iconColor = color, iconImagePath = null) }
+        edit { it.copy(iconKind = IconKind.TEXT, iconColor = color, iconImagePath = null, iconVersion = it.iconVersion + 1) }
         deleteImage()
     }
 
     fun useImageIcon(source: Uri) {
-        viewModelScope.launch {
+        guarded {
             val path = withContext(Dispatchers.IO) { iconImages.save(source, id) }
             if (path == null) {
                 events.send(DetailEvent.ImageFailed)
-                return@launch
+                return@guarded
             }
-            // The file name is fixed per clone, so a replaced image keeps its path; touch the record anyway.
-            edit { it.copy(iconKind = IconKind.IMAGE, iconImagePath = path) }
+            // The file name is fixed per clone, so a replaced image keeps its path and the record would
+            // compare equal; the version bump is what makes the UI reload the picture.
+            edit { it.copy(iconKind = IconKind.IMAGE, iconImagePath = path, iconVersion = it.iconVersion + 1) }
         }
     }
 
     /** Pins a launcher shortcut; reports why it could not when the launcher says no. */
     fun pinShortcut() {
         val record = item.value?.record ?: return
-        viewModelScope.launch {
+        guarded {
             val message = when {
                 !shortcuts.isSupported() -> DetailEvent.PinUnsupported
                 !shortcuts.pin(record) -> DetailEvent.PinFailed
@@ -122,8 +131,12 @@ class CloneDetailViewModel(
         }
     }
 
+    private fun guarded(block: suspend CoroutineScope.() -> Unit) {
+        launchGuarded({ events.send(DetailEvent.Error(it)) }, block)
+    }
+
     private fun edit(transform: (CloneRecord) -> CloneRecord) {
-        viewModelScope.launch {
+        guarded {
             repository.update(id, transform)
             repository.clones.value.firstOrNull { it.record.id == id }?.let {
                 withContext(Dispatchers.Default) { shortcuts.update(it.record) }

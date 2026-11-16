@@ -86,7 +86,7 @@ object AppVisuals {
 
     private fun imageIcon(context: Context, record: CloneRecord): Drawable? {
         val file = record.iconImagePath?.let(::File)?.takeIf { it.isFile } ?: return null
-        val key = "${file.path}:${file.lastModified()}"
+        val key = "${file.path}:${file.lastModified()}:${record.iconVersion}"
         images.get(key)?.let { return it.newDrawable(context.resources) }
         val bitmap = BitmapFactory.decodeFile(file.path) ?: return null
         val drawable = BitmapDrawable(context.resources, bitmap)

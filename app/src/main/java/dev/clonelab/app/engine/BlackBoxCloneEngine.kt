@@ -1,6 +1,7 @@
 package dev.clonelab.app.engine
 
 import android.net.Uri
+import android.os.SystemClock
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.DeviceProfile
 import dev.clonelab.app.model.LocationConfig
@@ -16,7 +17,27 @@ class BlackBoxCloneEngine : CloneEngine {
 
     private val core get() = BlackBoxCore.get()
 
-    override fun awaitReady(timeoutMs: Long): Boolean = safe(false) { core.waitForServicesAvailable(timeoutMs) }
+    private companion object {
+        const val POLL_MS = 200L
+        const val UNAVAILABLE = "The clone engine is not running."
+    }
+
+    override fun isAvailable(): Boolean = safe(false) { core.isEngineAlive() }
+
+    /** Polls for a live engine server; `waitForServicesAvailable` is not usable because it also succeeds without one. */
+    override fun awaitReady(timeoutMs: Long): Boolean {
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
+        while (true) {
+            if (isAvailable()) return true
+            if (SystemClock.elapsedRealtime() >= deadline) return false
+            try {
+                Thread.sleep(POLL_MS)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return false
+            }
+        }
+    }
 
     override fun installFromInstalledApp(packageName: String, userId: Int): EngineResult =
         guarded { toResult(core.installPackageAsUser(packageName, userId)) }
@@ -29,8 +50,19 @@ class BlackBoxCloneEngine : CloneEngine {
             outcome
         }
 
-    override fun usedUserIds(packageName: String): Set<Int> = safe(emptySet()) {
-        core.users.map { it.id }.filter { core.isInstalled(packageName, it) }.toSet()
+    override fun usedUserIds(packageName: String): Set<Int> {
+        check(isAvailable()) { UNAVAILABLE }
+        val used = core.users.map { it.id }.filter { core.isInstalled(packageName, it) }.toSet()
+        // An engine that died mid-query reads as "nothing installed"; never report that as a result.
+        check(isAvailable()) { UNAVAILABLE }
+        return used
+    }
+
+    override fun existingUserIds(): Set<Int> {
+        check(isAvailable()) { UNAVAILABLE }
+        val ids = core.users.map { it.id }.toSet()
+        check(isAvailable()) { UNAVAILABLE }
+        return ids
     }
 
     override fun isInstalled(id: CloneId): Boolean = safe(false) { core.isInstalled(id.packageName, id.userId) }

@@ -14,7 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import dev.clonelab.app.ui.launchGuarded
 import java.security.SecureRandom
 import kotlin.random.Random
 import kotlin.random.asKotlinRandom
@@ -32,6 +33,7 @@ enum class IdentifierField { ANDROID_ID, IMEI, SERIAL, WIFI_MAC }
 
 sealed interface DeviceEvent {
     data object Saved : DeviceEvent
+    data class Failed(val message: String) : DeviceEvent
     data class Invalid(val fields: Set<IdentifierField>) : DeviceEvent
 }
 
@@ -53,8 +55,8 @@ class DeviceProfileViewModel(
     val messages: Flow<DeviceEvent> = events.receiveAsFlow()
 
     init {
-        viewModelScope.launch {
-            repository.refresh()
+        guarded {
+            repository.refreshWhenReady()
             val stored = repository.clones.value.firstOrNull { it.record.id == id }?.record?.deviceProfile
             _draft.value = if (stored == null) {
                 DeviceDraft()
@@ -128,14 +130,18 @@ class DeviceProfileViewModel(
     }
 
     fun stopNow() {
-        viewModelScope.launch { repository.stop(id) }
+        guarded { repository.stop(id) }
     }
 
     private fun persist(profile: DeviceProfile?) {
-        viewModelScope.launch {
+        guarded {
             repository.update(id) { it.copy(deviceProfile = profile) }
             events.send(DeviceEvent.Saved)
         }
+    }
+
+    private fun guarded(block: suspend CoroutineScope.() -> Unit) {
+        launchGuarded({ events.send(DeviceEvent.Failed(it)) }, block)
     }
 
     private fun fromIdentifiers(presetName: String?, ids: Identifiers) = DeviceDraft(

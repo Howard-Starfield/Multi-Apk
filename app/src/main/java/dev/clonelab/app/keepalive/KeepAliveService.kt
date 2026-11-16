@@ -30,6 +30,10 @@ class KeepAliveService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var watchdog: Job? = null
+
+    /** Id of the latest start command; stopSelf(id) is ignored by Android if a newer start arrived. */
+    @Volatile
+    private var latestStartId = 0
     private val lastRestartAt = mutableMapOf<CloneId, Long>()
     private val alerted = mutableSetOf<CloneId>()
     private lateinit var notifications: KeepAliveNotifications
@@ -38,15 +42,17 @@ class KeepAliveService : Service() {
         super.onCreate()
         notifications = KeepAliveNotifications(this)
         notifications.createChannels()
+        ManualStops.install(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        latestStartId = startId
         try {
             startForeground(KeepAliveNotifications.SERVICE_ID, notifications.service(0))
         } catch (e: Exception) {
             // Android 12+ refuses this when started from the background; do not crash the app.
             Log.w(TAG, "Could not enter the foreground", e)
-            stopSelf()
+            stopSelf(startId)
             return START_NOT_STICKY
         }
         watchdog?.cancel()
@@ -61,7 +67,8 @@ class KeepAliveService : Service() {
                 }
                 delay(INTERVAL_MS)
             }
-            stopSelf()
+            // Nobody wants keep-alive any more (this is also how a "stop" request ends the service).
+            stopSelf(latestStartId)
         }
         return START_STICKY
     }

@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.clonelab.app.data.CloneRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -59,7 +60,13 @@ class AddCloneViewModel(
         if (installing.value) return
         installing.value = true
         viewModelScope.launch {
-            val result = block()
+            val result: Result<*> = try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure<Any?>(e)
+            }
             installing.value = false
             events.send(
                 result.fold(
