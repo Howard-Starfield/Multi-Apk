@@ -41,7 +41,7 @@ class SetupFlow(
         if (!active) return@registerForActivityResult
         // Still denied and the system will not ask again (or showed no prompt at all): offer the settings page once.
         val stuck = SetupStatusReader.missingClonePermissions(activity)
-            .filterNot { activity.shouldShowRequestPermissionRationale(it) }
+            .filterNot { androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale(activity, it) }
         if (stuck.isNotEmpty()) {
             toast(R.string.setup_toast_app_permissions)
             launchFirst()

@@ -34,8 +34,12 @@ class EditIconDialog(
     }
 
     private fun showSwatches() {
-        val colors = context.resources.obtainTypedArray(R.array.icon_swatches).use { array ->
+        // TypedArray is only AutoCloseable from API 31, so `use` would crash on older phones.
+        val array = context.resources.obtainTypedArray(R.array.icon_swatches)
+        val colors = try {
             IntArray(array.length()) { array.getColor(it, 0) }
+        } finally {
+            array.recycle()
         }
         val grid = GridLayout(context).apply {
             columnCount = COLUMNS

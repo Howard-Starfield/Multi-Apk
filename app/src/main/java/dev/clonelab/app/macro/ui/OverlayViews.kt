@@ -99,7 +99,9 @@ class StepperView @JvmOverloads constructor(context: Context, attrs: AttributeSe
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             imeOptions = EditorInfo.IME_ACTION_DONE
             setSingleLine(true)
-            importantForAutofill = IMPORTANT_FOR_AUTOFILL_NO
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                importantForAutofill = IMPORTANT_FOR_AUTOFILL_NO
+            }
             setOnEditorActionListener { _, actionId, _ ->
                 if (actionId == EditorInfo.IME_ACTION_DONE) {
                     endEdit(commit = true)
