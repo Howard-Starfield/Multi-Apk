@@ -6,4 +6,9 @@
         android:checkable="true"
         android:title="@string/home_floating_switcher"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/action_show_running"
+        android:checkable="true"
+        android:title="@string/home_show_running"
+        app:showAsAction="never" />
 </menu>

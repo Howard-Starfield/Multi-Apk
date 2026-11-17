@@ -30,7 +30,13 @@ class KeepAlivePrefs(context: Context) {
         return true
     }
 
+    /** Whether running clones are listed in notifications with Stop buttons (default on). */
+    var showRunningClones: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_RUNNING, true)
+        set(value) = prefs.edit().putBoolean(KEY_SHOW_RUNNING, value).apply()
+
     private companion object {
+        const val KEY_SHOW_RUNNING = "show_running_clones"
         const val KEY_GUIDE_SHOWN = "guide_shown"
         const val KEY_AUTOSTART_VISITED = "autostart_visited"
         const val KEY_NOTIFICATIONS_ASKED = "notifications_asked"

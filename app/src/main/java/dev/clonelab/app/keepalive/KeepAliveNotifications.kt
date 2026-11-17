@@ -10,6 +10,7 @@ import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import dev.clonelab.app.R
+import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.CloneRecord
 import dev.clonelab.app.shortcut.ShortcutTrampolineActivity
 import dev.clonelab.app.ui.AppVisuals
@@ -32,6 +33,14 @@ class KeepAliveNotifications(context: Context) {
             NotificationChannelCompat.Builder(CHANNEL_ALERT, NotificationManagerCompat.IMPORTANCE_DEFAULT)
                 .setName(context.getString(R.string.keepalive_alert_channel_name))
                 .setDescription(context.getString(R.string.keepalive_alert_channel_description))
+                .build(),
+        )
+        manager.createNotificationChannel(
+            NotificationChannelCompat.Builder(CHANNEL_RUNNING, NotificationManagerCompat.IMPORTANCE_LOW)
+                .setName(context.getString(R.string.running_channel_name))
+                .setDescription(context.getString(R.string.running_channel_description))
+                .setShowBadge(false)
+                .setSound(null, null)
                 .build(),
         )
     }
@@ -57,18 +66,23 @@ class KeepAliveNotifications(context: Context) {
 
     /** "<name> stopped - tap to restart"; tapping goes through the shortcut trampoline. */
     fun stopped(record: CloneRecord) {
-        // The data URI keeps the PendingIntents of different clones distinct: extras do not count for equality.
-        val restart = ShortcutTrampolineActivity.intent(context, record.id)
-            .setData(Uri.parse("clonelab://restart/${record.id.packageName}/${record.id.userId}"))
         val notification = NotificationCompat.Builder(context, CHANNEL_ALERT)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.app_name))
             .setContentText(context.getString(R.string.keepalive_stopped, AppVisuals.label(record)))
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
-            .setContentIntent(activity(restart))
+            .setContentIntent(launchIntent(record.id))
             .build()
         notify(tag(record), ALERT_ID, notification)
+    }
+
+    /** Brings the clone to the front via the trampoline; used by the "stopped" alert and the running notifications. */
+    fun launchIntent(id: CloneId): PendingIntent {
+        // The data URI keeps the PendingIntents of different clones distinct: extras do not count for equality.
+        val restart = ShortcutTrampolineActivity.intent(context, id)
+            .setData(Uri.parse("clonelab://restart/${id.packageName}/${id.userId}"))
+        return activity(restart)
     }
 
     fun cancelStopped(record: CloneRecord) {
@@ -89,7 +103,7 @@ class KeepAliveNotifications(context: Context) {
 
     private fun tag(record: CloneRecord) = "stopped:${record.id.packageName}#${record.id.userId}"
 
-    private fun activity(intent: Intent): PendingIntent {
+    fun activity(intent: Intent): PendingIntent {
         val immutable = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         return PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or immutable)
     }
@@ -99,5 +113,6 @@ class KeepAliveNotifications(context: Context) {
         private const val ALERT_ID = 4102
         private const val CHANNEL_SERVICE = "background_clones"
         private const val CHANNEL_ALERT = "clone_alerts"
+        const val CHANNEL_RUNNING = "running_clones"
     }
 }

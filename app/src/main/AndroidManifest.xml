@@ -65,6 +65,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".keepalive.RunningActionsReceiver"
+            android:exported="false" />
+
         <activity
             android:name=".shortcut.ShortcutTrampolineActivity"
             android:exported="false"

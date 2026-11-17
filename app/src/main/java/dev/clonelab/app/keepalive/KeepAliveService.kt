@@ -80,11 +80,13 @@ class KeepAliveService : Service() {
     /** Strong reference for the service's lifetime; the UI sees it through [macroRunner]. */
     private var macroRunnerField: MacroRunner? = null
     private lateinit var notifications: KeepAliveNotifications
+    private lateinit var runningNotifications: RunningNotifications
 
     override fun onCreate() {
         super.onCreate()
         notifications = KeepAliveNotifications(this)
         notifications.createChannels()
+        runningNotifications = RunningNotifications(this, scope, notifications, KeepAlivePrefs(this))
         ManualStops.install(this)
         overlay = SwitcherOverlay(this, SwitcherPrefs(this), ::switchTo, onMacros = { macroOverlays?.openPanel() })
         val runner = MacroRunner(
@@ -115,6 +117,7 @@ class KeepAliveService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
+        runningNotifications.requestRefresh(force = true) // also applies a changed setting
         watchdog?.cancel()
         watchdog = scope.launch {
             while (isActive) {
@@ -147,6 +150,7 @@ class KeepAliveService : Service() {
         // Scope first, so a recording start that has not run yet cannot create its flag afterwards; then
         // the runner cancels an active recording and clears the flag.
         scope.cancel()
+        runningNotifications.shutdown()
         macroRunnerField?.shutdown()
         macroRunnerField = null
         mainHandler.removeCallbacksAndMessages(null)
@@ -189,6 +193,7 @@ class KeepAliveService : Service() {
             records.size, all.size, SwitcherPrefs(this@KeepAliveService).enabled, scheduled,
         )
         if (!wanted && !macroBusy) return@withContext false
+        runningNotifications.requestRefresh()
         runner?.tick()
         if (records.isEmpty()) return@withContext true // only the switcher needs the service
         val engine = ServiceLocator.engine()
@@ -258,6 +263,7 @@ class KeepAliveService : Service() {
         var lastRecords: List<CloneRecord>? = null
         var icons: Map<CloneId, Drawable> = emptyMap()
         var pushed: List<SwitcherItem>? = null
+        var lastFocused: CloneId? = null
         try {
             while (true) {
                 val allowed = prefs.enabled &&
@@ -270,6 +276,10 @@ class KeepAliveService : Service() {
                         items = prepared.items
                         lastRecords = prepared.records
                         icons = prepared.icons
+                        // A different clone coming to the front is a cheap hint that something started.
+                        val focusedNow = items.firstOrNull { it.state == SwitcherState.FOCUSED }?.id
+                        if (focusedNow != null && focusedNow != lastFocused) runningNotifications.requestRefresh()
+                        if (focusedNow != null) lastFocused = focusedNow
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {

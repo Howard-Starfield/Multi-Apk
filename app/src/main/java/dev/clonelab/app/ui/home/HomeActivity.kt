@@ -14,6 +14,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.recyclerview.widget.GridLayoutManager
 import com.google.android.material.snackbar.Snackbar
+import dev.clonelab.app.keepalive.KeepAlivePrefs
 import dev.clonelab.app.keepalive.SetupBanner
 import dev.clonelab.app.keepalive.SetupFlow
 import dev.clonelab.app.keepalive.SetupStatusReader
@@ -107,6 +108,7 @@ class HomeActivity : AppCompatActivity() {
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         menu.findItem(R.id.action_switcher).isChecked = SwitcherPrefs(this).enabled
+        menu.findItem(R.id.action_show_running).isChecked = KeepAlivePrefs(this).showRunningClones
         return super.onPrepareOptionsMenu(menu)
     }
 
@@ -116,6 +118,12 @@ class HomeActivity : AppCompatActivity() {
                 SwitcherPrefs(this).enabled = !item.isChecked
                 invalidateOptionsMenu()
                 // The service starts or ends (and shows or hides the pill) according to the new setting.
+                KeepAliveController.sync(applicationContext)
+            }
+            R.id.action_show_running -> {
+                KeepAlivePrefs(this).showRunningClones = !item.isChecked
+                invalidateOptionsMenu()
+                // The service refreshes its notifications on every start command (and cancels them when off).
                 KeepAliveController.sync(applicationContext)
             }
             else -> return super.onOptionsItemSelected(item)
