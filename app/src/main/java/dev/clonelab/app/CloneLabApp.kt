@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.Context
 import android.os.Bundle
 import dev.clonelab.app.macro.RecorderHook
+import dev.clonelab.app.switcher.CloneLabForeground
 import top.niunaijun.blackbox.BlackBoxCore
 import top.niunaijun.blackbox.app.BActivityThread
 import top.niunaijun.blackbox.app.configuration.AppLifecycleCallback
@@ -40,6 +41,8 @@ class CloneLabApp : Application() {
         BlackBoxCore.get().doCreate()
         installRecorderHook()
         cleanStaleRecordings()
+        // Main process only: clone activities live in other processes and must not count as CloneLab on screen.
+        if (BlackBoxCore.get().isMainProcess) CloneLabForeground.install(this)
     }
 
     /**

@@ -1,11 +1,59 @@
 package dev.clonelab.app.switcher
 
 import dev.clonelab.app.model.CloneId
+import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.model.CloneRecord
+import dev.clonelab.app.ui.home.groupByApp
 
 enum class SwitcherState { FOCUSED, RUNNING, IDLE }
 
-data class SwitcherItem(val id: CloneId, val number: Int, val label: String, val state: SwitcherState)
+/** One cell of the pill's grid: a cloned app (Apps level) or a clone (Clones level). */
+sealed interface SwitcherCell
+
+data class SwitcherItem(val id: CloneId, val number: Int, val label: String, val state: SwitcherState) : SwitcherCell
+
+/** One cloned app at the Apps level; [representative] is the clone whose app icon is shown. */
+data class SwitcherAppItem(
+    val packageName: String,
+    val label: String,
+    val count: Int,
+    val anyRunning: Boolean,
+    val representative: CloneRecord,
+) : SwitcherCell
+
+/** What the pill shows. */
+sealed interface SwitcherView {
+    data object Hidden : SwitcherView
+
+    /** One entry per cloned app. */
+    data class Apps(val apps: List<SwitcherAppItem>) : SwitcherView
+
+    /** The clones of [packageName]. [showMacros]: a clone of this very app is focused, so Macros apply to it. */
+    data class Clones(val packageName: String, val items: List<SwitcherItem>, val showMacros: Boolean) : SwitcherView
+}
+
+enum class NavLevel {
+    /** No choice made: Clones of the focused clone's app, or Apps inside CloneLab. */
+    DEFAULT,
+    APPS,
+    APP,
+}
+
+/**
+ * What the user chose in the pill. It only counts while the context it was made in lasts: [anchor] is the
+ * focused clone at that time (null inside CloneLab); when the focus moves, the choice is dropped.
+ */
+data class SwitcherNav(val anchor: CloneId? = null, val level: NavLevel = NavLevel.DEFAULT, val packageName: String? = null) {
+    companion object {
+        val NONE = SwitcherNav()
+
+        fun drill(anchor: CloneId?, packageName: String) = SwitcherNav(anchor, NavLevel.APP, packageName)
+
+        fun back(anchor: CloneId?) = SwitcherNav(anchor, NavLevel.APPS)
+    }
+}
+
+data class SwitcherReduction(val view: SwitcherView, val nav: SwitcherNav)
 
 object SwitcherModel {
     /**
@@ -20,17 +68,75 @@ object SwitcherModel {
         labelOf: (CloneRecord) -> String = { it.displayName },
     ): List<SwitcherItem> {
         if (focused == null) return emptyList()
-        val samePackage = records
-            .filter { it.id.packageName == focused.packageName }
-            .sortedWith(compareBy({ it.sortOrder }, { it.createdAt }))
-        if (samePackage.none { it.id == focused }) return emptyList()
-        return samePackage.map { record ->
+        if (records.none { it.id == focused }) return emptyList()
+        return clonesOf(focused.packageName, records, focused, running, labelOf)
+    }
+
+    private fun clonesOf(
+        packageName: String,
+        records: List<CloneRecord>,
+        focused: CloneId?,
+        running: Set<CloneId>,
+        labelOf: (CloneRecord) -> String,
+    ): List<SwitcherItem> = records
+        .filter { it.id.packageName == packageName }
+        .sortedWith(compareBy({ it.sortOrder }, { it.createdAt }))
+        .map { record ->
             val state = when {
                 record.id == focused -> SwitcherState.FOCUSED
                 record.id in running -> SwitcherState.RUNNING
                 else -> SwitcherState.IDLE
             }
             SwitcherItem(record.id, record.number, labelOf(record), state)
+        }
+
+    /** One entry per app, grouped and ordered like the Home screen ([groupByApp]). */
+    fun apps(
+        records: List<CloneRecord>,
+        running: Set<CloneId>,
+        appLabelOf: (packageName: String, stored: String) -> String = { _, stored -> stored },
+    ): List<SwitcherAppItem> =
+        groupByApp(records.map { CloneItem(it, installed = true, running = it.id in running) }).map {
+            SwitcherAppItem(it.packageName, appLabelOf(it.packageName, it.label), it.cloneCount, it.anyRunning, it.representative)
+        }
+
+    /**
+     * Decides what the pill shows and the navigation state to keep.
+     *
+     * Hidden when there are no clones, or when neither a clone is focused nor CloneLab is in front. A focused
+     * clone wins over "CloneLab in front". The choice in [nav] is dropped when the focused clone changed since
+     * it was made or the pill was hidden in between; an app that lost its last clone falls back to Apps.
+     */
+    fun reduce(
+        records: List<CloneRecord>,
+        running: Set<CloneId>,
+        focused: CloneId?,
+        inCloneLab: Boolean,
+        nav: SwitcherNav,
+        labelOf: (CloneRecord) -> String = { it.displayName },
+        appLabelOf: (packageName: String, stored: String) -> String = { _, stored -> stored },
+    ): SwitcherReduction {
+        val anchor = focused?.takeIf { f -> records.any { it.id == f } }
+        if (records.isEmpty() || (anchor == null && !inCloneLab)) return SwitcherReduction(SwitcherView.Hidden, SwitcherNav.NONE)
+        val current = if (nav.anchor == anchor) nav else SwitcherNav(anchor)
+        fun clones(packageName: String) = SwitcherView.Clones(
+            packageName,
+            clonesOf(packageName, records, anchor, running, labelOf),
+            showMacros = anchor != null && anchor.packageName == packageName,
+        )
+        val apps = { SwitcherView.Apps(apps(records, running, appLabelOf)) }
+        return when (current.level) {
+            NavLevel.APPS -> SwitcherReduction(apps(), current)
+            NavLevel.APP -> {
+                val pkg = current.packageName
+                if (pkg != null && records.any { it.id.packageName == pkg }) {
+                    SwitcherReduction(clones(pkg), current)
+                } else {
+                    SwitcherReduction(apps(), SwitcherNav.back(anchor))
+                }
+            }
+            NavLevel.DEFAULT ->
+                if (anchor != null) SwitcherReduction(clones(anchor.packageName), current) else SwitcherReduction(apps(), current)
         }
     }
 }

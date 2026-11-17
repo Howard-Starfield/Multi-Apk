@@ -28,10 +28,12 @@ import dev.clonelab.app.macro.ScreenMetrics
 import dev.clonelab.app.macro.ui.MacroOverlays
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.CloneRecord
+import dev.clonelab.app.switcher.CloneLabForeground
 import dev.clonelab.app.switcher.FocusDebouncer
-import dev.clonelab.app.switcher.SwitcherItem
+import dev.clonelab.app.switcher.NavLevel
 import dev.clonelab.app.switcher.SwitcherModel
-import dev.clonelab.app.switcher.SwitcherState
+import dev.clonelab.app.switcher.SwitcherNav
+import dev.clonelab.app.switcher.SwitcherView
 import dev.clonelab.app.switcher.SwitcherOverlay
 import dev.clonelab.app.switcher.SwitcherPrefs
 import dev.clonelab.app.ui.AppVisuals
@@ -42,13 +44,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.lang.ref.WeakReference
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Foreground service of the main process that keeps the app alive while any clone has keep-alive on,
@@ -67,6 +72,16 @@ class KeepAliveService : Service() {
 
     /** Touched on the main thread only. */
     private var overlay: SwitcherOverlay? = null
+
+    /** What the user chose in the pill. Written by taps (main thread) and by the poll (IO); see [prepareSwitcher]. */
+    private val switcherNav = AtomicReference(SwitcherNav.NONE)
+
+    /** The focused clone the pill was last reduced for (null inside CloneLab): the context of a tap. */
+    @Volatile
+    private var navAnchor: CloneId? = null
+
+    /** Wakes the switcher loop before its 700 ms are up. */
+    private val switcherWake = Channel<Unit>(Channel.CONFLATED)
 
     /** The macro panel, editor and bars. Touched on the main thread only. */
     private var macroOverlays: MacroOverlays? = null
@@ -91,7 +106,12 @@ class KeepAliveService : Service() {
         notifications.createChannels()
         runningNotifications = RunningNotifications(this, scope, notifications, KeepAlivePrefs(this))
         ManualStops.install(this)
-        overlay = SwitcherOverlay(this, SwitcherPrefs(this), ::switchTo, onMacros = { macroOverlays?.openPanel() })
+        overlay = SwitcherOverlay(
+            this, SwitcherPrefs(this), ::switchTo,
+            onSelectApp = { packageName -> navigate(SwitcherNav.drill(navAnchor, packageName)) },
+            onBack = { navigate(SwitcherNav.back(navAnchor)) },
+            onMacros = { macroOverlays?.openPanel() },
+        )
         val runner = MacroRunner(
             scope = scope,
             recorder = ServiceLocator.macroRecorder(this),
@@ -278,15 +298,25 @@ class KeepAliveService : Service() {
     }
 
     private class Prepared(
-        val items: List<SwitcherItem>,
+        val view: SwitcherView,
+        /** The focused clone if the store knows it; what the macro windows follow. */
+        val focused: CloneId?,
         val records: List<CloneRecord>?,
-        val icons: Map<CloneId, Drawable>,
+        val cloneIcons: Map<CloneId, Drawable>,
+        val appIcons: Map<String, Drawable>,
     )
 
+    /** The user tapped an app or the back row (main thread): remember it and refresh the pill at once. */
+    private fun navigate(next: SwitcherNav) {
+        switcherNav.set(next)
+        switcherWake.trySend(Unit)
+    }
+
     /**
-     * Polls the focused clone and mirrors it into the pill. Engine, store and icon work run on IO;
-     * window calls run on the main thread. The pill is removed when the setting is off, the overlay
-     * permission is gone or the screen is off. Icons are rebuilt only when the records change.
+     * Polls the focused clone and whether CloneLab itself is in front, and mirrors them into the pill.
+     * Engine, store and icon work run on IO; window calls run on the main thread. The pill is removed when
+     * the setting is off, the overlay permission is gone, the screen is off or the user exited. Icons are
+     * rebuilt only when the records change. A tap in the pill wakes the loop early instead of waiting.
      */
     private suspend fun runSwitcher() {
         val debouncer = FocusDebouncer()
@@ -294,25 +324,30 @@ class KeepAliveService : Service() {
         val keepAlivePrefs = KeepAlivePrefs(this)
         val power = getSystemService(Context.POWER_SERVICE) as PowerManager
         var lastRecords: List<CloneRecord>? = null
-        var icons: Map<CloneId, Drawable> = emptyMap()
-        var pushed: List<SwitcherItem>? = null
+        var cloneIcons: Map<CloneId, Drawable> = emptyMap()
+        var appIcons: Map<String, Drawable> = emptyMap()
+        var pushed: SwitcherView? = null
         var lastFocused: CloneId? = null
         try {
             while (true) {
                 val allowed = prefs.enabled && !keepAlivePrefs.exitedByUser &&
                     (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)) &&
                     power.isInteractive
-                var items = emptyList<SwitcherItem>()
+                var view: SwitcherView = SwitcherView.Hidden
+                var focusedKnown: CloneId? = null
                 if (allowed) {
                     try {
-                        val prepared = withContext(Dispatchers.IO) { prepareSwitcher(debouncer, lastRecords, icons) }
-                        items = prepared.items
+                        val prepared = withContext(Dispatchers.IO) {
+                            prepareSwitcher(debouncer, lastRecords, cloneIcons, appIcons)
+                        }
+                        view = prepared.view
+                        focusedKnown = prepared.focused
                         lastRecords = prepared.records
-                        icons = prepared.icons
+                        cloneIcons = prepared.cloneIcons
+                        appIcons = prepared.appIcons
                         // A different clone coming to the front is a cheap hint that something started.
-                        val focusedNow = items.firstOrNull { it.state == SwitcherState.FOCUSED }?.id
-                        if (focusedNow != null && focusedNow != lastFocused) runningNotifications.requestRefresh()
-                        if (focusedNow != null) lastFocused = focusedNow
+                        if (focusedKnown != null && focusedKnown != lastFocused) runningNotifications.requestRefresh()
+                        if (focusedKnown != null) lastFocused = focusedKnown
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -320,25 +355,26 @@ class KeepAliveService : Service() {
                     }
                 } else {
                     debouncer.reset()
+                    switcherNav.set(SwitcherNav.NONE)
                 }
-                val shownIcons = icons
+                val shownClones = cloneIcons
+                val shownApps = appIcons
                 withContext(Dispatchers.Main.immediate) {
-                    val focusedId = items.firstOrNull { it.state == SwitcherState.FOCUSED }?.id
-                    val appLabel = focusedId?.let { id ->
+                    val appLabel = focusedKnown?.let { id ->
                         lastRecords?.firstOrNull { it.id.packageName == id.packageName }?.appLabel
-                    } ?: focusedId?.packageName.orEmpty()
-                    macroOverlays?.onFocusChanged(focusedId, appLabel)
+                    } ?: focusedKnown?.packageName.orEmpty()
+                    macroOverlays?.onFocusChanged(focusedKnown, appLabel)
                     val window = overlay ?: return@withContext
-                    if (items.isEmpty()) {
+                    if (view == SwitcherView.Hidden) {
                         pushed = null
                         window.hide()
-                    } else if (items != pushed || !window.isShown) {
-                        window.show(items, shownIcons)
+                    } else if (view != pushed || !window.isShown) {
+                        window.show(view, shownClones, shownApps)
                         // A refused window is retried on the next pass.
-                        pushed = if (window.isShown) items else null
+                        pushed = if (window.isShown) view else null
                     }
                 }
-                delay(SWITCHER_POLL_MS)
+                withTimeoutOrNull(SWITCHER_POLL_MS) { switcherWake.receive() }
             }
         } finally {
             // Normally onDestroy has removed the window; this covers a job that ends on its own.
@@ -349,20 +385,36 @@ class KeepAliveService : Service() {
     private fun prepareSwitcher(
         debouncer: FocusDebouncer,
         lastRecords: List<CloneRecord>?,
-        lastIcons: Map<CloneId, Drawable>,
+        lastCloneIcons: Map<CloneId, Drawable>,
+        lastAppIcons: Map<String, Drawable>,
     ): Prepared {
         val engine = ServiceLocator.engine()
         val focused = debouncer.onPoll(engine.focusedClone())
-            ?: return Prepared(emptyList(), lastRecords, lastIcons)
-        val records = ServiceLocator.store(applicationContext).all().filter { it.id.packageName == focused.packageName }
-        var icons = lastIcons
-        if (records != lastRecords || icons.isEmpty()) {
+        val inCloneLab = CloneLabForeground.isForeground
+        val records = ServiceLocator.store(applicationContext).all()
+        var cloneIcons = lastCloneIcons
+        var appIcons = lastAppIcons
+        if (records != lastRecords || cloneIcons.isEmpty()) {
             AppVisuals.warmUp(applicationContext, engine, records)
-            icons = records.associate { it.id to AppVisuals.icon(applicationContext, it) }
+            cloneIcons = records.associate { it.id to AppVisuals.icon(applicationContext, it) }
+            appIcons = SwitcherModel.apps(records, emptySet())
+                .associate { it.packageName to AppVisuals.appIcon(applicationContext, it.representative) }
         }
-        val running = records.filter { it.id != focused && engine.isRunning(it.id) }.map { it.id }.toSet()
-        val items = SwitcherModel.items(records, focused, running, AppVisuals::label)
-        return Prepared(items, records, icons)
+        val nav = switcherNav.get()
+        // Only the focused app's clones are needed while its Clones level shows; any other level lists every app.
+        val needAll = inCloneLab || nav.level != NavLevel.DEFAULT
+        val running = records
+            .filter { needAll || focused == null || it.id.packageName == focused.packageName }
+            .filter { engine.isRunning(it.id) }
+            .map { it.id }.toSet()
+        val reduction = SwitcherModel.reduce(
+            records, running, focused, inCloneLab, nav, AppVisuals::label, AppVisuals::appLabel,
+        )
+        // A tap that arrived meanwhile has replaced the snapshot: keep the tap.
+        switcherNav.compareAndSet(nav, reduction.nav)
+        navAnchor = focused?.takeIf { f -> records.any { it.id == f } }
+        val focusedKnown = navAnchor
+        return Prepared(reduction.view, focusedKnown, records, cloneIcons, appIcons)
     }
 
     companion object {

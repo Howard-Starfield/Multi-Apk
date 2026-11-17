@@ -149,6 +149,7 @@
         <item quantity="other">还有 %d 项需要处理</item>
     </plurals>
     <string name="guide_fix_all">全部设置</string>
+    <string name="switcher_back">‹ 全部应用</string>
     <string name="switcher_handle">分身切换器拖柄</string>
     <string name="switcher_launch_failed">无法切换：%1$s</string>
     <!-- Macros: floating UI -->

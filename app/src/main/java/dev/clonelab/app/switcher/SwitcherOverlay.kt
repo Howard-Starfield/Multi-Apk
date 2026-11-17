@@ -36,6 +36,8 @@ class SwitcherOverlay(
     context: Context,
     private val prefs: SwitcherPrefs,
     onSelect: (CloneId) -> Unit,
+    onSelectApp: (String) -> Unit,
+    private val onBack: () -> Unit,
     private val onMacros: () -> Unit = {},
 ) {
     private val themed = ContextThemeWrapper(context, R.style.Theme_CloneLab)
@@ -44,10 +46,17 @@ class SwitcherOverlay(
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val handler = Handler(Looper.getMainLooper())
     private val autoCollapse = Runnable { setCollapsed(true) }
-    private val adapter = SwitcherAdapter { id ->
-        onSelect(id)
-        scheduleCollapse(COLLAPSE_AFTER_SELECT_MS)
-    }
+    private val adapter = SwitcherAdapter(
+        onSelect = { id ->
+            onSelect(id)
+            scheduleCollapse(COLLAPSE_AFTER_SELECT_MS)
+        },
+        // Drilling into an app launches nothing: the pill stays open on the new level.
+        onSelectApp = { packageName ->
+            onSelectApp(packageName)
+            scheduleCollapse(COLLAPSE_IDLE_MS)
+        },
+    )
 
     /** The pill always starts as the slim tab and folds back to it when left alone. */
     private var collapsed = true
@@ -61,22 +70,50 @@ class SwitcherOverlay(
     private var tab: View? = null
     private var grip: View? = null
     private var macrosDot: View? = null
+    private var macrosButton: View? = null
+    private var backRow: View? = null
+
+    /** Which list is showing ("apps" or a package name), to scroll to the top when it changes. */
+    private var shownKey: String? = null
     private var macroBusy = MacroBusy.NONE
     private var params: WindowManager.LayoutParams? = null
 
     val isShown: Boolean get() = root != null
 
-    /** Shows or refreshes the pill. An empty list hides it. */
-    fun show(items: List<SwitcherItem>, icons: Map<CloneId, Drawable>) {
-        if (items.isEmpty()) {
+    /** Shows or refreshes the pill. [SwitcherView.Hidden] or an empty list hides it. */
+    fun show(view: SwitcherView, cloneIcons: Map<CloneId, Drawable>, appIcons: Map<String, Drawable>) {
+        val cells: List<SwitcherCell>
+        val key: String
+        when (view) {
+            SwitcherView.Hidden -> {
+                hide()
+                return
+            }
+            is SwitcherView.Apps -> {
+                cells = view.apps
+                key = APPS_KEY
+            }
+            is SwitcherView.Clones -> {
+                cells = view.items
+                key = view.packageName
+            }
+        }
+        if (cells.isEmpty()) {
             hide()
             return
         }
         if (root == null && !attach()) return
-        adapter.update(items, icons)
+        adapter.update(cells, cloneIcons, appIcons)
+        if (key != shownKey) {
+            shownKey = key
+            list?.scrollToPosition(0)
+        }
+        val clones = view as? SwitcherView.Clones
+        backRow?.visibility = if (clones != null) View.VISIBLE else View.GONE
+        macrosButton?.visibility = if (clones?.showMacros == true) View.VISIBLE else View.GONE
         list?.let { rv ->
             val lp = rv.layoutParams
-            lp.height = SwitcherGeometry.visibleRows(items.size) * dp(ROW_DP)
+            lp.height = SwitcherGeometry.visibleRows(cells.size) * dp(ROW_DP)
             rv.layoutParams = lp
         }
         applyCollapsed()
@@ -115,6 +152,9 @@ class SwitcherOverlay(
         root = null
         grip = null
         macrosDot = null
+        macrosButton = null
+        backRow = null
+        shownKey = null
         pill = null
         list = null
         tab = null
@@ -153,6 +193,10 @@ class SwitcherOverlay(
         view.findViewById<View>(R.id.macros).setOnClickListener {
             setCollapsed(true)
             onMacros()
+        }
+        view.findViewById<View>(R.id.back).setOnClickListener {
+            onBack()
+            scheduleCollapse(COLLAPSE_IDLE_MS)
         }
         // A touch anywhere else on the screen folds the pill away. The touch itself still reaches
         // the clone underneath: this window only watches it.
@@ -202,6 +246,8 @@ class SwitcherOverlay(
         tab = view.findViewById(R.id.tab)
         grip = view.findViewById(R.id.grip)
         macrosDot = view.findViewById(R.id.macrosDot)
+        macrosButton = view.findViewById(R.id.macros)
+        backRow = view.findViewById(R.id.back)
         params = lp
         return true
     }
@@ -398,6 +444,7 @@ class SwitcherOverlay(
 
     private companion object {
         const val TAG = "SwitcherOverlay"
+        const val APPS_KEY = "\u0000apps"
         const val COLUMNS = 2
         const val ROW_DP = 54
         const val TAB_COLOR = 0x661C1B1F // slim and see-through: it sits on top of the clone

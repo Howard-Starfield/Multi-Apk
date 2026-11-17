@@ -152,6 +152,7 @@
         <item quantity="other">%d items still need attention</item>
     </plurals>
     <string name="guide_fix_all">Fix all</string>
+    <string name="switcher_back">‹ All apps</string>
     <string name="switcher_handle">Clone switcher handle</string>
     <string name="switcher_launch_failed">Could not switch: %1$s</string>
     <!-- Macros: floating UI -->
