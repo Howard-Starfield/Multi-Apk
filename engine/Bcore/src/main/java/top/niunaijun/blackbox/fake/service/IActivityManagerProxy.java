@@ -619,6 +619,13 @@ public class IActivityManagerProxy extends ClassInvocationStub {
                     args[i] = null;
                 }
             }
+            // The last argument is the target user. A clone asking for "all users" or another
+            // user (Google Play services does) would be refused by the system with a
+            // SecurityException; every clone lives in the host's own user.
+            int last = args.length - 1;
+            if (last >= 0 && args[last] instanceof Integer) {
+                args[last] = BlackBoxCore.getHostUserId();
+            }
             return method.invoke(who, args);
         }
 
@@ -800,6 +807,30 @@ public class IActivityManagerProxy extends ClassInvocationStub {
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             Object blackBox = BRUserInfo.get()._new(BActivityThread.getUserId(), "BlackBox", BRUserInfo.get().FLAG_PRIMARY());
             return blackBox;
+        }
+    }
+
+    /**
+     * Android 14+ asks through this variant (permission, pid, uid, deviceId). Without it the
+     * answers below never applied there; e.g. the framework's own ACCOUNT_MANAGER check inside an
+     * account authenticator refused the engine, so no account could be added in a clone.
+     */
+    @ProxyMethod("checkPermissionForDevice")
+    public static class checkPermissionForDevice extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            String permission = (String) args[0];
+            if (permission != null && (permission.equals(Manifest.permission.ACCOUNT_MANAGER)
+                    || permission.equals(Manifest.permission.SEND_SMS)
+                    || isAudioPermission(permission)
+                    || isStorageOrMediaPermission(permission))) {
+                return PackageManager.PERMISSION_GRANTED;
+            }
+            // uid is the third argument here; the last one is the device id.
+            if (args.length > 2 && args[2] instanceof Integer && (int) args[2] == BlackBoxCore.getBUid()) {
+                args[2] = BlackBoxCore.getHostUid();
+            }
+            return method.invoke(who, args);
         }
     }
 

@@ -44,6 +44,19 @@ public class IUserManagerProxy extends BinderInvocationStub {
         }
     }
 
+    /**
+     * Asked by Google Play services' account authenticator about itself. The system only answers
+     * this for the caller's own package, and a clone is not that package to the system, so it threw
+     * a SecurityException and adding an account failed. A clone has no managed restrictions.
+     */
+    @ProxyMethod("getApplicationRestrictionsForUser")
+    public static class GetApplicationRestrictionsForUser extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return new android.os.Bundle();
+        }
+    }
+
     @ProxyMethod("getProfileParent")
     public static class GetProfileParent extends MethodHook {
         @Override

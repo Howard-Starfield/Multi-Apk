@@ -134,11 +134,21 @@ public class IPackageManagerProxy extends BinderInvocationStub {
             int flags = MethodParameterUtils.toInt(args[1]);
             
             
-            if ("com.android.vending".equals(packageName)) {
+            PackageInfo packageInfo = BlackBoxCore.getBPackageManager().getPackageInfo(packageName, flags, BlackBoxCore.getUserId());
+            if (packageInfo == null && "com.android.vending".equals(packageName)) {
+                // No Play Store inside this clone number. Apps verify that the Play Store is signed
+                // by Google, so a made-up entry (no signatures) makes them report the device as
+                // unsupported: answer with the phone's real one when it exists, and only fall
+                // back to the placeholder when the phone has none.
+                try {
+                    Object real = method.invoke(who, args);
+                    if (real != null) {
+                        return real;
+                    }
+                } catch (Throwable ignored) {
+                }
                 return createFakeGooglePlayServicesPackageInfo();
             }
-            
-            PackageInfo packageInfo = BlackBoxCore.getBPackageManager().getPackageInfo(packageName, flags, BlackBoxCore.getUserId());
             if (packageInfo != null) {
                 
                 if (packageInfo.requestedPermissions != null && packageInfo.requestedPermissionsFlags != null) {

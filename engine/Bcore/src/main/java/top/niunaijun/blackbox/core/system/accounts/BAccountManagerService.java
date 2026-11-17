@@ -1825,7 +1825,23 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
 
 
 
-            if (!mContext.bindService(intent, this, flags)) {
+            // This runs in the engine's server process, where binds are not redirected for us.
+            // Ask the engine for the stub service that hosts the authenticator inside this
+            // virtual user and bind that; binding the component as-is would reach the phone's
+            // real package (and be refused by the system).
+            Intent bindIntent;
+            try {
+                bindIntent = top.niunaijun.blackbox.core.system.am.BActivityManagerService.get()
+                        .bindService(intent, null, null, mAccounts.userId);
+            } catch (Throwable t) {
+                Log.w(TAG, "could not start authenticator " + componentName + " for user " + mAccounts.userId, t);
+                return false;
+            }
+            if (bindIntent == null || bindIntent == intent) {
+                Log.w(TAG, "authenticator " + componentName + " is not installed for user " + mAccounts.userId);
+                return false;
+            }
+            if (!mContext.bindService(bindIntent, this, flags)) {
                 if (Log.isLoggable(TAG, Log.VERBOSE)) {
                     Log.v(TAG, "bindService to " + componentName + " failed");
                 }
