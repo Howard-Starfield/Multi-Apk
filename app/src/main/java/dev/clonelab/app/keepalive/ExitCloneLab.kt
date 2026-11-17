@@ -2,6 +2,7 @@ package dev.clonelab.app.keepalive
 
 import android.app.ActivityManager
 import android.app.PendingIntent
+import android.app.job.JobScheduler
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -31,6 +32,11 @@ object ExitCloneLab {
     private const val ENGINE_READY_TIMEOUT_MS = 3_000L
     private const val SERVICE_STOP_WAIT_MS = 2_500L
     private const val POLL_MS = 50L
+    private const val RESPAWN_WAIT_MS = 1_500L
+
+    /** The engine hosts each clone process's services in one of these (one per process slot). */
+    private const val STUB_SERVICE_PREFIX = "top.niunaijun.blackbox.proxy.ProxyService\$P"
+    private const val STUB_SLOTS = 50
 
     private fun intent(context: Context): Intent =
         Intent(context, ExitReceiver::class.java).setAction(ACTION_EXIT).setData(Uri.parse("clonelab://exit"))
@@ -80,9 +86,20 @@ object ExitCloneLab {
         step("cancel notifications again") { NotificationManagerCompat.from(app).cancelAll() }
         // 5. The engine's daemon (explicit stop: Android does not sticky-restart a service that was stopped).
         step("stop engine daemon") { app.stopService(Intent().setClassName(app, ENGINE_DAEMON)) }
+        // A clone's own started services live in the engine's stub services. They are sticky to
+        // Android: killing their process without stopping them makes Android restart it (and with
+        // it the engine) a second later. The same goes for jobs a clone scheduled.
+        step("stop stub services") { stopStubServices(app) }
+        step("cancel jobs") { (app.getSystemService(Context.JOB_SCHEDULER_SERVICE) as? JobScheduler)?.cancelAll() }
         // 6. Recents, then the processes.
         step("remove tasks") { removeTasks(app) }
         step("kill processes") { killProcesses(app) }
+        // Anything Android brought back in the meantime (a restart that was already scheduled).
+        step("kill stragglers") {
+            Thread.sleep(RESPAWN_WAIT_MS)
+            stopStubServices(app)
+            killProcesses(app)
+        }
     }
 
     private inline fun step(name: String, block: () -> Unit) {
@@ -127,6 +144,16 @@ object ExitCloneLab {
         val end = System.currentTimeMillis() + timeoutMs
         while (KeepAliveService.isAlive && System.currentTimeMillis() < end) Thread.sleep(POLL_MS)
         return !KeepAliveService.isAlive
+    }
+
+    private fun stopStubServices(app: Context) {
+        for (slot in 0 until STUB_SLOTS) {
+            try {
+                app.stopService(Intent().setClassName(app, STUB_SERVICE_PREFIX + slot))
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not stop stub service $slot", e)
+            }
+        }
     }
 
     private fun removeTasks(app: Context) {
