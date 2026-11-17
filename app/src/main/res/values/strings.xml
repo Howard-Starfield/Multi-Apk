@@ -2,8 +2,9 @@
 <resources>
     <string name="app_name">CloneLab</string>
 
-    <string name="home_empty">No clones yet. Tap "Add clone" to make your first one.</string>
+    <string name="home_empty">No clones yet. Tap "Add" to make your first one.</string>
     <string name="home_add_clone">Add clone</string>
+    <string name="home_add_app">Add</string>
     <string name="home_engine_failed">The clone engine did not start.</string>
     <string name="home_retry">Retry</string>
     <string name="home_broken_label">%1$s (broken)</string>

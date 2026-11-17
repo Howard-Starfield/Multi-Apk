@@ -13,8 +13,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import androidx.recyclerview.widget.GridLayoutManager
-import androidx.recyclerview.widget.ItemTouchHelper
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.snackbar.Snackbar
 import dev.clonelab.app.keepalive.SetupBanner
 import dev.clonelab.app.keepalive.SetupFlow
@@ -22,12 +20,11 @@ import dev.clonelab.app.keepalive.SetupStatusReader
 import dev.clonelab.app.switcher.SwitcherPrefs
 import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
-import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.databinding.ActivityHomeBinding
 import dev.clonelab.app.keepalive.KeepAliveController
 import dev.clonelab.app.ui.AppVisuals
 import dev.clonelab.app.ui.add.AddCloneActivity
-import dev.clonelab.app.ui.detail.CloneDetailActivity
+import dev.clonelab.app.ui.group.CloneGroupActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,8 +32,7 @@ import kotlinx.coroutines.withContext
 class HomeActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityHomeBinding
-    private lateinit var adapter: CloneAdapter
-    private lateinit var touchHelper: ItemTouchHelper
+    private lateinit var adapter: AppGroupAdapter
     private lateinit var setupFlow: SetupFlow
     private val viewModel: HomeViewModel by viewModels {
         viewModelFactory {
@@ -49,16 +45,12 @@ class HomeActivity : AppCompatActivity() {
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        adapter = CloneAdapter(
-            onClick = ::onCloneClicked,
-            onLongClick = ::openDetail,
-            onDragStart = { touchHelper.startDrag(it) },
+        adapter = AppGroupAdapter(
+            onAppClick = ::openGroup,
+            onAddClick = { startActivity(Intent(this, AddCloneActivity::class.java)) },
         )
         binding.list.layoutManager = GridLayoutManager(this, COLUMNS)
         binding.list.adapter = adapter
-        touchHelper = ItemTouchHelper(DragCallback())
-        touchHelper.attachToRecyclerView(binding.list)
-        binding.fab.setOnClickListener { startActivity(Intent(this, AddCloneActivity::class.java)) }
         binding.retry.setOnClickListener { viewModel.checkEngine() }
         setupFlow = SetupFlow(this) { remaining ->
             val text = if (remaining == 0) {
@@ -75,10 +67,10 @@ class HomeActivity : AppCompatActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     viewModel.state.collect { state ->
-                        adapter.submitList(state.items)
-                        warmUpVisuals(state.items)
+                        adapter.submitList(state.groups)
+                        warmUpVisuals(state.groups)
                         binding.empty.visibility =
-                            if (state.items.isEmpty() && !state.engineFailed) View.VISIBLE else View.GONE
+                            if (state.groups.isEmpty() && !state.engineFailed) View.VISIBLE else View.GONE
                         binding.banner.visibility = if (state.engineFailed) View.VISIBLE else View.GONE
                     }
                 }
@@ -114,19 +106,12 @@ class HomeActivity : AppCompatActivity() {
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        menu.findItem(R.id.action_reorder).setTitle(
-            if (adapter.reorderMode) R.string.home_reorder_done else R.string.home_reorder,
-        )
         menu.findItem(R.id.action_switcher).isChecked = SwitcherPrefs(this).enabled
         return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.action_reorder -> {
-                adapter.reorderMode = !adapter.reorderMode
-                invalidateOptionsMenu()
-            }
             R.id.action_switcher -> {
                 SwitcherPrefs(this).enabled = !item.isChecked
                 invalidateOptionsMenu()
@@ -139,46 +124,17 @@ class HomeActivity : AppCompatActivity() {
     }
 
     /** Loads APK-derived labels and icons off the main thread, then rebinds if anything changed. */
-    private fun warmUpVisuals(items: List<CloneItem>) {
+    private fun warmUpVisuals(groups: List<AppGroup>) {
         lifecycleScope.launch {
             val changed = withContext(Dispatchers.IO) {
-                AppVisuals.warmUp(applicationContext, ServiceLocator.engine(), items.map { it.record })
+                AppVisuals.warmUp(applicationContext, ServiceLocator.engine(), groups.map { it.representative })
             }
             if (changed) adapter.notifyItemRangeChanged(0, adapter.itemCount)
         }
     }
 
-    /** Drag is started from touch in reorder mode, never by long press (that opens the detail). */
-    private inner class DragCallback : ItemTouchHelper.SimpleCallback(
-        ItemTouchHelper.UP or ItemTouchHelper.DOWN or ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,
-        0,
-    ) {
-        override fun isLongPressDragEnabled() = false
-
-        override fun onMove(
-            recyclerView: RecyclerView,
-            viewHolder: RecyclerView.ViewHolder,
-            target: RecyclerView.ViewHolder,
-        ): Boolean {
-            adapter.move(viewHolder.bindingAdapterPosition, target.bindingAdapterPosition)
-            return true
-        }
-
-        override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) = Unit
-
-        override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
-            super.clearView(recyclerView, viewHolder)
-            viewModel.reorder(adapter.order())
-        }
-    }
-
-    private fun onCloneClicked(item: CloneItem) {
-        // A broken clone cannot be launched; its detail screen offers removal.
-        if (item.installed) viewModel.launch(item.record.id) else openDetail(item)
-    }
-
-    private fun openDetail(item: CloneItem) {
-        startActivity(CloneDetailActivity.intent(this, item.record.id))
+    private fun openGroup(group: AppGroup) {
+        startActivity(CloneGroupActivity.intent(this, group.packageName))
     }
 
     private companion object {

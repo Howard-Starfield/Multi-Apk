@@ -2,10 +2,6 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_reorder"
-        android:title="@string/home_reorder"
-        app:showAsAction="never" />
-    <item
         android:id="@+id/action_switcher"
         android:checkable="true"
         android:title="@string/home_floating_switcher"

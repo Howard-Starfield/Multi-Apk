@@ -36,6 +36,12 @@ object AppVisuals {
         return if (apkLabel != null) "$apkLabel ${record.number}" else record.displayName
     }
 
+    /** The app's own name (no clone number): APK-derived when the app is not on the phone, else as stored. */
+    fun appLabel(packageName: String, stored: String): String = apkInfo[packageName]?.label ?: stored
+
+    /** The source app's icon, ignoring any custom icon of the clone. */
+    fun appIcon(context: Context, record: CloneRecord): Drawable = sourceIcon(context, record) ?: placeholder(context)
+
     fun icon(context: Context, record: CloneRecord): Drawable {
         when (record.iconKind) {
             IconKind.IMAGE -> imageIcon(context, record)?.let { return it }

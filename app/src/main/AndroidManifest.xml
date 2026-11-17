@@ -31,6 +31,9 @@
             android:exported="false"
             android:label="@string/add_clone_title" />
         <activity
+            android:name=".ui.group.CloneGroupActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.detail.CloneDetailActivity"
             android:exported="false"
             android:label="@string/detail_title" />

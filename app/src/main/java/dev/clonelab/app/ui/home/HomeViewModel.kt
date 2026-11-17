@@ -2,14 +2,10 @@ package dev.clonelab.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.data.CloneRepository
 import dev.clonelab.app.engine.CloneEngine
-import dev.clonelab.app.model.CloneId
-import dev.clonelab.app.R
 import dev.clonelab.app.ui.UserMessage
 import dev.clonelab.app.ui.launchGuarded
-import dev.clonelab.app.ui.toUserMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +17,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.withContext
 
-data class HomeState(val items: List<CloneItem> = emptyList(), val engineFailed: Boolean = false)
+data class HomeState(val groups: List<AppGroup> = emptyList(), val engineFailed: Boolean = false)
 
 class HomeViewModel(
     private val repository: CloneRepository,
@@ -34,7 +30,7 @@ class HomeViewModel(
     val state: StateFlow<HomeState> = combine(
         repository.clones, engineReady, repository.engineAvailable,
     ) { items, ready, available ->
-        HomeState(items, engineFailed = ready == false || !available)
+        HomeState(groupByApp(items), engineFailed = ready == false || !available)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeState())
 
     /** One-shot error messages for the UI to show. */
@@ -53,16 +49,6 @@ class HomeViewModel(
 
     fun refresh() {
         if (engineReady.value == true) launchGuarded(::report) { repository.refresh() }
-    }
-
-    fun launch(id: CloneId) {
-        launchGuarded(::report) {
-            repository.launch(id).onFailure { errors.send(it.toUserMessage(R.string.error_launch_failed)) }
-        }
-    }
-
-    fun reorder(ids: List<CloneId>) {
-        launchGuarded(::report) { repository.reorder(ids) }
     }
 
     private suspend fun report(message: UserMessage) {

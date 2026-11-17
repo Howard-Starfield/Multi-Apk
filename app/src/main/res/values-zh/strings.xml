@@ -2,8 +2,9 @@
 <resources>
     <string name="app_name">CloneLab</string>
 
-    <string name="home_empty">还没有分身。点按“添加分身”创建第一个吧。</string>
+    <string name="home_empty">还没有分身。点按“添加”创建第一个吧。</string>
     <string name="home_add_clone">添加分身</string>
+    <string name="home_add_app">添加</string>
     <string name="home_engine_failed">分身引擎未能启动。</string>
     <string name="home_retry">重试</string>
     <string name="home_broken_label">%1$s（已损坏）</string>

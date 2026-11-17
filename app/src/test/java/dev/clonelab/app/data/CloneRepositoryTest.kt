@@ -185,6 +185,82 @@ class CloneRepositoryTest {
         assertEquals(listOf(second.id, first.id), repository.clones.value.map { it.record.id })
     }
 
+    // --- another clone of the same app ---
+
+    @Test
+    fun anotherCloneOfAnInstalledAppUsesThePhoneApp() = runTest {
+        setUp()
+        val first = repository.addFromInstalledApp("com.a", "A").getOrThrow()
+        engine.apkPaths[first.id] = "/data/base.apk"
+
+        val second = repository.addAnotherClone("com.a", installedOnPhone = true).getOrThrow()
+
+        assertEquals(CloneId("com.a", 1), second.id)
+        assertEquals("A", second.appLabel)
+        assertEquals(2, store.all().size)
+    }
+
+    @Test
+    fun anotherCloneOfAnApkOnlyAppReusesTheEnginesApk() = runTest {
+        setUp()
+        val first = repository.addFromApk("content://apk", "Karaoke").getOrThrow()
+        engine.apkPaths[first.id] = "/data/app/base.apk"
+
+        val second = repository.addAnotherClone(first.id.packageName, installedOnPhone = false).getOrThrow()
+
+        assertEquals(first.id.packageName, second.id.packageName)
+        assertEquals(1, second.id.userId)
+        assertEquals("Karaoke", second.appLabel)
+        assertTrue(second.keepAlive)
+        assertEquals(2, store.all().size)
+    }
+
+    @Test
+    fun anApkOnlyAppWithoutAKnownApkPathCreatesNothing() = runTest {
+        setUp()
+        val first = repository.addFromApk("content://apk", "Karaoke").getOrThrow()
+
+        val result = repository.addAnotherClone(first.id.packageName, installedOnPhone = false)
+
+        assertTrue(result.isFailure)
+        assertEquals(1, store.all().size)
+        assertEquals(setOf(first.id), engine.installed)
+    }
+
+    @Test
+    fun anotherCloneOfAnUnknownAppFails() = runTest {
+        setUp()
+        val result = repository.addAnotherClone("com.none", installedOnPhone = true)
+        assertEquals(CloneError.UnknownClone, (result.exceptionOrNull() as CloneException).error)
+        assertTrue(store.all().isEmpty())
+    }
+
+    @Test
+    fun failedInstallOfAnotherCloneCreatesNoRecord() = runTest {
+        setUp()
+        val first = repository.addFromApk("content://apk", "K").getOrThrow()
+        engine.apkPaths[first.id] = "/data/base.apk"
+        engine.installError = "boom"
+
+        assertTrue(repository.addAnotherClone(first.id.packageName, installedOnPhone = false).isFailure)
+        assertTrue(repository.addAnotherClone(first.id.packageName, installedOnPhone = true).isFailure)
+
+        assertEquals(1, store.all().size)
+    }
+
+    @Test
+    fun anotherCloneNeedsAReachableEngine() = runTest {
+        setUp()
+        val first = repository.addFromApk("content://apk", "K").getOrThrow()
+        engine.apkPaths[first.id] = "/data/base.apk"
+        engine.available = false
+
+        val result = repository.addAnotherClone(first.id.packageName, installedOnPhone = false)
+
+        assertTrue(result.exceptionOrNull() is EngineUnavailableException)
+        assertEquals(1, store.all().size)
+    }
+
     // --- engine availability ---
 
     @Test

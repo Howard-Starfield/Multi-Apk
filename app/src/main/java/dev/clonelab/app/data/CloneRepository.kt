@@ -78,6 +78,30 @@ class CloneRepository(
             }
         }
 
+    /**
+     * Another clone of an app that already has one. An app installed on the phone is cloned from there;
+     * otherwise (cloned from an APK file) the APK the engine already holds is installed again.
+     * Fails without creating a record when the app has no clone, or no APK can be found.
+     */
+    suspend fun addAnotherClone(packageName: String, installedOnPhone: Boolean): Result<CloneRecord> {
+        val existing = withContext(Dispatchers.IO) { store.all().filter { it.id.packageName == packageName } }
+        val label = existing.firstOrNull()?.appLabel
+            ?: return Result.failure(CloneException(CloneError.UnknownClone))
+        if (installedOnPhone) return addFromInstalledApp(packageName, label)
+        val apk: Result<String> = withContext(Dispatchers.IO) {
+            attempt {
+                requireEngine()
+                val path = existing.firstNotNullOfOrNull { engine.apkPath(it.id) }
+                if (path == null) Result.failure<String>(CloneException(CloneError.InstallFailed(null))) else Result.success(path)
+            }
+        }
+        // Same form as Uri.fromFile(File(path)).toString().
+        return apk.fold(
+            onSuccess = { addFromApk("file://$it", label) },
+            onFailure = { Result.failure(it) },
+        )
+    }
+
     suspend fun launch(id: CloneId): Result<Unit> = withContext(Dispatchers.IO) {
         val record = store.get(id) ?: return@withContext Result.failure(CloneException(CloneError.UnknownClone))
         ManualStops.remove(id)
