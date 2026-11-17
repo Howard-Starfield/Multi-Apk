@@ -439,6 +439,17 @@ class KeepAliveService : Service() {
         @Volatile
         private var instanceRef: WeakReference<KeepAliveService>? = null
 
+        /**
+         * Ends a running service from inside the process, any thread. Unlike a start command this
+         * does not make the service enter the foreground again first, so no notification can be
+         * (re)posted on the way out. False when there is no running service.
+         */
+        fun exitNow(): Boolean {
+            val service = instanceRef?.get() ?: return false
+            service.mainHandler.post { service.leaveForExit() }
+            return true
+        }
+
         /** Exit step 2, any thread: cancels macros and removes the pill and every macro window right now. */
         fun prepareExit() {
             val service = instanceRef?.get() ?: return

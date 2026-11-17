@@ -51,13 +51,25 @@ class KeepAliveNotifications(context: Context) {
         } else {
             context.getString(R.string.keepalive_none_running)
         }
+        // A custom content view so the Exit button is visible without expanding the notification.
+        val content = android.widget.RemoteViews(context.packageName, R.layout.notification_service).apply {
+            setTextViewText(R.id.title, context.getString(R.string.app_name))
+            setTextViewText(R.id.text, text)
+            setOnClickPendingIntent(R.id.exit, ExitCloneLab.pendingIntent(context))
+        }
         return NotificationCompat.Builder(context, CHANNEL_SERVICE)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(context.getString(R.string.app_name))
             .setContentText(text)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setCustomContentView(content)
+            .setCustomBigContentView(content)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            // Its own group: Android bundles an app's ungrouped notifications once there are four,
+            // which buried this one (and its Exit button) under notifications posted by clones.
+            .setGroup(GROUP_SERVICE)
             .setContentIntent(activity(Intent(context, HomeActivity::class.java)))
             .addAction(0, context.getString(R.string.keepalive_exit), ExitCloneLab.pendingIntent(context))
             .build()
@@ -111,6 +123,7 @@ class KeepAliveNotifications(context: Context) {
 
     companion object {
         const val SERVICE_ID = 4101
+        private const val GROUP_SERVICE = "clonelab.service"
         private const val ALERT_ID = 4102
         private const val CHANNEL_SERVICE = "background_clones"
         private const val CHANNEL_ALERT = "clone_alerts"

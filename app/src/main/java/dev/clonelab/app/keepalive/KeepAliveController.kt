@@ -43,6 +43,7 @@ object KeepAliveController {
      */
     fun reviveAfterExit(context: Context) {
         val app = context.applicationContext
+        if (ExitCloneLab.inProgress) return // a screen resurfacing while we shut down is not the user
         val prefs = KeepAlivePrefs(app)
         if (!prefs.exitedByUser) return
         prefs.clearExited()

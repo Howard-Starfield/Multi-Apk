@@ -25,6 +25,14 @@ data class OwnProcess(val name: String, val pid: Int)
  */
 object ExitCloneLab {
     private const val TAG = "ExitCloneLab"
+
+    /**
+     * True from the moment an exit starts until this process dies. While it is set, nothing in this
+     * process may treat a screen appearing as the user coming back (see KeepAliveController).
+     */
+    @Volatile
+    var inProgress = false
+        private set
     const val ACTION_EXIT = "dev.clonelab.app.action.EXIT_CLONELAB"
 
     /** Engine's sticky foreground service in :black. A string, so only the engine files import the engine. */
@@ -33,6 +41,8 @@ object ExitCloneLab {
     private const val SERVICE_STOP_WAIT_MS = 2_500L
     private const val POLL_MS = 50L
     private const val RESPAWN_WAIT_MS = 1_500L
+    private const val NOTIFICATION_SWEEPS = 5
+    private const val NOTIFICATION_SWEEP_MS = 200L
 
     /** The engine hosts each clone process's services in one of these (one per process slot). */
     private const val STUB_SERVICE_PREFIX = "top.niunaijun.blackbox.proxy.ProxyService\$P"
@@ -72,12 +82,17 @@ object ExitCloneLab {
      * caller, after it has released its broadcast. Runs off the main thread (blocks, up to a few seconds).
      */
     fun run(app: Context) {
+        inProgress = true
         val prefs = KeepAlivePrefs(app)
         // 1. The flag first: from now on nothing may bring the service back.
         step("persist flag") { prefs.exitedByUser = true }
         // 2. Macros and every overlay window.
         step("hide overlays") { KeepAliveService.prepareExit() }
         step("cancel recording files") { ServiceLocator.macroRecorder(app).cancel() }
+        // Our tasks go first. Otherwise closing a clone that is on screen brings the CloneLab screen
+        // underneath it back to the front, and a screen coming to the front means "the user opened
+        // CloneLab again": it would undo the exit.
+        step("remove tasks") { removeTasks(app) }
         // 3. Stop every running clone through the normal path (marks them as manually stopped).
         step("stop clones") { stopClones(app) }
         // 4. Notifications, then the keep-alive service through its own command.
@@ -99,6 +114,15 @@ object ExitCloneLab {
             Thread.sleep(RESPAWN_WAIT_MS)
             stopStubServices(app)
             killProcesses(app)
+        }
+        // Last thing before this process ends: nothing of ours may be left in the notification shade.
+        step("clear notifications") {
+            val manager = app.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            repeat(NOTIFICATION_SWEEPS) {
+                manager.cancelAll()
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || manager.activeNotifications.isEmpty()) return@step
+                Thread.sleep(NOTIFICATION_SWEEP_MS)
+            }
         }
     }
 
@@ -126,6 +150,9 @@ object ExitCloneLab {
 
     private fun stopKeepAliveService(app: Context) {
         if (!KeepAliveService.isAlive) return
+        // Same process: end it directly. A start command would first put the service back in the
+        // foreground, and that notification could outlive the process.
+        if (KeepAliveService.exitNow() && waitUntilStopped(SERVICE_STOP_WAIT_MS)) return
         // startForegroundService, like every other start: the service enters the foreground first (the
         // contract), then sees the command, leaves the foreground and stops itself.
         val delivered = try {

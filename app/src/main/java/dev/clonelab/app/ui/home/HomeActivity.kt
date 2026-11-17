@@ -87,7 +87,7 @@ class HomeActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         // Opening CloneLab again ends an "Exit CloneLab"; onResume's sync then brings the service back.
-        KeepAlivePrefs(this).clearExited()
+        if (!dev.clonelab.app.keepalive.ExitCloneLab.inProgress) KeepAlivePrefs(this).clearExited()
     }
 
     override fun onResume() {
