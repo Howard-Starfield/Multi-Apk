@@ -16,6 +16,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.ViewConfiguration
 import android.widget.Toast
+import androidx.core.app.ServiceCompat
 import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
 import dev.clonelab.app.macro.InstrumentationInjector
@@ -84,6 +85,8 @@ class KeepAliveService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        alive = true
+        instanceRef = WeakReference(this)
         notifications = KeepAliveNotifications(this)
         notifications.createChannels()
         runningNotifications = RunningNotifications(this, scope, notifications, KeepAlivePrefs(this))
@@ -117,6 +120,12 @@ class KeepAliveService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
+        // "Exit CloneLab": the command itself, or a sticky restart / stale start after one. The service has
+        // entered the foreground above (the contract), so it can now leave it and end.
+        if (intent?.action == ACTION_EXIT || KeepAlivePrefs(this).exitedByUser) {
+            leaveForExit()
+            return START_NOT_STICKY
+        }
         runningNotifications.requestRefresh(force = true) // also applies a changed setting
         watchdog?.cancel()
         watchdog = scope.launch {
@@ -137,6 +146,26 @@ class KeepAliveService : Service() {
         return START_STICKY
     }
 
+    /** Main thread. Ends everything this service owns, leaves the foreground and stops itself. */
+    private fun leaveForExit() {
+        watchdog?.cancel()
+        switcherJob?.cancel()
+        hideForExit()
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf() // not stopSelf(startId): the exit must win over any newer start command
+    }
+
+    /** Main thread: cancels macro recording/playback and removes the pill and every macro window. */
+    private fun hideForExit() {
+        macroRunnerField?.let {
+            it.cancelRecording()
+            it.stop()
+        }
+        macroOverlays?.destroy()
+        macroOverlays = null
+        overlay?.hide()
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -147,6 +176,7 @@ class KeepAliveService : Service() {
 
     override fun onDestroy() {
         runnerRef = null
+        instanceRef = null
         // Scope first, so a recording start that has not run yet cannot create its flag afterwards; then
         // the runner cancels an active recording and clears the flag.
         scope.cancel()
@@ -159,6 +189,7 @@ class KeepAliveService : Service() {
         macroOverlays = null
         overlay?.hide()
         overlay = null
+        alive = false
         super.onDestroy()
     }
 
@@ -191,6 +222,7 @@ class KeepAliveService : Service() {
         val macroBusy = runner != null && runner.state.value != MacroRunState.Idle
         val wanted = KeepAliveController.shouldRun(
             records.size, all.size, SwitcherPrefs(this@KeepAliveService).enabled, scheduled,
+            exitedByUser = KeepAlivePrefs(this@KeepAliveService).exitedByUser,
         )
         if (!wanted && !macroBusy) return@withContext false
         runningNotifications.requestRefresh()
@@ -259,6 +291,7 @@ class KeepAliveService : Service() {
     private suspend fun runSwitcher() {
         val debouncer = FocusDebouncer()
         val prefs = SwitcherPrefs(this)
+        val keepAlivePrefs = KeepAlivePrefs(this)
         val power = getSystemService(Context.POWER_SERVICE) as PowerManager
         var lastRecords: List<CloneRecord>? = null
         var icons: Map<CloneId, Drawable> = emptyMap()
@@ -266,7 +299,7 @@ class KeepAliveService : Service() {
         var lastFocused: CloneId? = null
         try {
             while (true) {
-                val allowed = prefs.enabled &&
+                val allowed = prefs.enabled && !keepAlivePrefs.exitedByUser &&
                     (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)) &&
                     power.isInteractive
                 var items = emptyList<SwitcherItem>()
@@ -344,6 +377,38 @@ class KeepAliveService : Service() {
         /** The macro runner of the running service, or null when the service is not running. */
         val macroRunner: MacroRunner? get() = runnerRef?.get()
 
+        private const val ACTION_EXIT = "dev.clonelab.app.action.EXIT_SERVICE"
+
+        /** True from onCreate to onDestroy; lets the exit sequence wait until the service is really gone. */
+        @Volatile
+        private var alive = false
+        val isAlive: Boolean get() = alive
+
+        @Volatile
+        private var instanceRef: WeakReference<KeepAliveService>? = null
+
+        /** Exit step 2, any thread: cancels macros and removes the pill and every macro window right now. */
+        fun prepareExit() {
+            val service = instanceRef?.get() ?: return
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                service.hideForExit()
+            } else {
+                // Blocks until done so the next exit step starts with the windows gone.
+                val latch = java.util.concurrent.CountDownLatch(1)
+                service.mainHandler.post {
+                    try {
+                        service.hideForExit()
+                    } finally {
+                        latch.countDown()
+                    }
+                }
+                latch.await(2, java.util.concurrent.TimeUnit.SECONDS)
+            }
+        }
+
         fun intent(context: Context) = Intent(context, KeepAliveService::class.java)
+
+        /** Delivered with startForegroundService; the service goes foreground, then leaves it and stops. */
+        fun exitIntent(context: Context) = intent(context).setAction(ACTION_EXIT)
     }
 }

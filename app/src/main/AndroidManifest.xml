@@ -69,6 +69,10 @@
             android:name=".keepalive.RunningActionsReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".keepalive.ExitReceiver"
+            android:exported="false" />
+
         <activity
             android:name=".shortcut.ShortcutTrampolineActivity"
             android:exported="false"

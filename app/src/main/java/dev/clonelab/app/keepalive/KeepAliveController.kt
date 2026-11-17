@@ -25,10 +25,29 @@ object KeepAliveController {
     /**
      * Whether [KeepAliveService] has a reason to run: a clone with keep-alive, or the floating switcher
      * being on with at least one clone, or a macro with a schedule. The service re-evaluates this on every start command and stops
-     * itself when it no longer holds. Pure, so the stop logic is testable.
+     * itself when it no longer holds. [exitedByUser] (the user chose "Exit CloneLab") overrides all of it
+     * until the user opens CloneLab again. Pure, so the stop logic is testable.
      */
-    fun shouldRun(keepAliveCount: Int, cloneCount: Int, switcherEnabled: Boolean, scheduledMacroCount: Int): Boolean =
-        keepAliveCount > 0 || (switcherEnabled && cloneCount > 0) || scheduledMacroCount > 0
+    fun shouldRun(
+        keepAliveCount: Int,
+        cloneCount: Int,
+        switcherEnabled: Boolean,
+        scheduledMacroCount: Int,
+        exitedByUser: Boolean,
+    ): Boolean =
+        !exitedByUser && (keepAliveCount > 0 || (switcherEnabled && cloneCount > 0) || scheduledMacroCount > 0)
+
+    /**
+     * The user opened a screen or a clone shortcut: ends an "Exit CloneLab" and, only then, runs a sync
+     * (the screens that always sync do so themselves). Cheap otherwise; safe on the main thread.
+     */
+    fun reviveAfterExit(context: Context) {
+        val app = context.applicationContext
+        val prefs = KeepAlivePrefs(app)
+        if (!prefs.exitedByUser) return
+        prefs.clearExited()
+        sync(app)
+    }
 
     /** Fire and forget; [onDone] runs on a background thread once the service has been sent its intent. */
     fun sync(context: Context, onDone: () -> Unit = {}) {
@@ -43,6 +62,8 @@ object KeepAliveController {
     }
 
     private fun deliver(app: Context) {
+        // "Exit CloneLab": stay down until the user opens the app again.
+        if (KeepAlivePrefs(app).exitedByUser) return
         try {
             ContextCompat.startForegroundService(app, KeepAliveService.intent(app))
         } catch (e: Exception) {

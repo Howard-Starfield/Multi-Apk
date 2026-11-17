@@ -35,7 +35,23 @@ class KeepAlivePrefs(context: Context) {
         get() = prefs.getBoolean(KEY_SHOW_RUNNING, true)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_RUNNING, value).apply()
 
+    /**
+     * The user chose "Exit CloneLab". While set, nothing starts [KeepAliveService] by itself (boot, sync,
+     * schedules, watchdog). Written with commit(): the process is killed right after it is set.
+     */
+    var exitedByUser: Boolean
+        get() = prefs.getBoolean(KEY_EXITED, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_EXITED, value).commit()
+        }
+
+    /** The user opened CloneLab (or a clone shortcut) again. Cheap when the flag is not set; safe on the main thread. */
+    fun clearExited() {
+        if (exitedByUser) prefs.edit().putBoolean(KEY_EXITED, false).apply()
+    }
+
     private companion object {
+        const val KEY_EXITED = "exited_by_user"
         const val KEY_SHOW_RUNNING = "show_running_clones"
         const val KEY_GUIDE_SHOWN = "guide_shown"
         const val KEY_AUTOSTART_VISITED = "autostart_visited"

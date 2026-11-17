@@ -6,6 +6,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -22,6 +23,7 @@ import dev.clonelab.app.switcher.SwitcherPrefs
 import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
 import dev.clonelab.app.databinding.ActivityHomeBinding
+import dev.clonelab.app.keepalive.ExitCloneLab
 import dev.clonelab.app.keepalive.KeepAliveController
 import dev.clonelab.app.ui.AppVisuals
 import dev.clonelab.app.ui.add.AddCloneActivity
@@ -82,6 +84,12 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Opening CloneLab again ends an "Exit CloneLab"; onResume's sync then brings the service back.
+        KeepAlivePrefs(this).clearExited()
+    }
+
     override fun onResume() {
         super.onResume()
         viewModel.refresh()
@@ -126,9 +134,18 @@ class HomeActivity : AppCompatActivity() {
                 // The service refreshes its notifications on every start command (and cancels them when off).
                 KeepAliveController.sync(applicationContext)
             }
+            R.id.action_exit -> confirmExit()
             else -> return super.onOptionsItemSelected(item)
         }
         return true
+    }
+
+    private fun confirmExit() {
+        AlertDialog.Builder(this)
+            .setMessage(R.string.exit_confirm_message)
+            .setPositiveButton(R.string.home_exit) { _, _ -> ExitCloneLab.request(applicationContext) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     /** Loads APK-derived labels and icons off the main thread, then rebinds if anything changed. */

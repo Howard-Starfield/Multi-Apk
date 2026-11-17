@@ -21,6 +21,7 @@ import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
 import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.databinding.ActivityCloneGroupBinding
+import dev.clonelab.app.keepalive.KeepAliveController
 import dev.clonelab.app.ui.AppVisuals
 import dev.clonelab.app.ui.detail.CloneDetailActivity
 import dev.clonelab.app.ui.home.CloneAdapter
@@ -84,6 +85,11 @@ class CloneGroupActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        KeepAliveController.reviveAfterExit(this)
     }
 
     override fun onResume() {

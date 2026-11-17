@@ -11,4 +11,8 @@
         android:checkable="true"
         android:title="@string/home_show_running"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/action_exit"
+        android:title="@string/home_exit"
+        app:showAsAction="never" />
 </menu>

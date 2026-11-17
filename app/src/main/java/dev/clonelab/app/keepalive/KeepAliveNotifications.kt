@@ -59,6 +59,7 @@ class KeepAliveNotifications(context: Context) {
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(activity(Intent(context, HomeActivity::class.java)))
+            .addAction(0, context.getString(R.string.keepalive_exit), ExitCloneLab.pendingIntent(context))
             .build()
     }
 

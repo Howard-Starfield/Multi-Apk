@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
+import dev.clonelab.app.keepalive.KeepAliveController
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.ui.toUserMessage
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,8 @@ class ShortcutTrampolineActivity : ComponentActivity() {
             return
         }
         val id = CloneId(packageName, intent.getIntExtra(EXTRA_USER_ID, 0))
+        // A shortcut ends an "Exit CloneLab" and brings the keep-alive service back.
+        KeepAliveController.reviveAfterExit(this)
         lifecycleScope.launch {
             val engine = ServiceLocator.engine()
             val ready = withContext(Dispatchers.IO) { engine.awaitReady(READY_TIMEOUT_MS) }
