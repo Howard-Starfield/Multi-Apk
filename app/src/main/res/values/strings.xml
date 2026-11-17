@@ -231,4 +231,8 @@
     <string name="macro_wrong_orientation_landscape">This macro was recorded in landscape. Rotate the phone and try again.</string>
     <string name="keepalive_channel_description">Shows that clones are being kept alive in the background.</string>
     <string name="keepalive_alert_channel_description">Tells you when a clone has stopped.</string>
+    <string name="setup_restricted_title">Android is blocking this setting</string>
+    <string name="setup_restricted_message">If the \"Display over other apps\" switch was greyed out: Android 15 restricts it for apps installed from a file, until you allow it once.\n\n1. Tap \"Open app info\".\n2. Tap the ⋮ menu in the top-right corner.\n3. Choose \"Allow restricted settings\" and confirm with your screen lock.\n4. Go back. The switch will work now.\n\nNo such menu item? Tap the greyed-out switch once so Android shows its warning, then look again.</string>
+    <string name="setup_restricted_open">Open app info</string>
+    <string name="setup_restricted_later">Later</string>
 </resources>

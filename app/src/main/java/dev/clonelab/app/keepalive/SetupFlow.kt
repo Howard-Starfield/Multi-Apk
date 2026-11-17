@@ -34,6 +34,12 @@ class SetupFlow(
     private val attempted = mutableSetOf<SetupStep>()
     private var active = false
 
+    /** The step whose settings page is open right now. */
+    private var current: SetupStep? = null
+
+    /** The restricted-settings help is shown at most once per run. */
+    private var restrictedHelpShown = false
+
     /** Set when only one step was asked for (a row of the guide); null walks through everything missing. */
     private var only: SetupStep? = null
 
@@ -57,7 +63,13 @@ class SetupFlow(
     }
 
     private val screen = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        if (active) advance()
+        if (!active) return@registerForActivityResult
+        if (current == SetupStep.OVERLAY && overlayLooksRestricted() && !restrictedHelpShown) {
+            restrictedHelpShown = true
+            showRestrictedHelp()
+        } else {
+            advance()
+        }
     }
 
     val isRunning: Boolean get() = active
@@ -70,6 +82,8 @@ class SetupFlow(
     private fun begin(step: SetupStep?) {
         if (active) return
         attempted.clear()
+        restrictedHelpShown = false
+        current = null
         only = step
         active = true
         advance()
@@ -95,6 +109,7 @@ class SetupFlow(
             return
         }
         attempted += step
+        current = step
         when (step) {
             SetupStep.APP_PERMISSIONS -> askClonePermissions()
             SetupStep.NOTIFICATIONS -> askNotifications()
@@ -119,6 +134,34 @@ class SetupFlow(
                 launchFirst(*vendor.toTypedArray())
             }
         }
+    }
+
+    /**
+     * Android 15 greys out "Display over other apps" for apps installed from a file (a "restricted
+     * setting") until the user lifts the restriction on the app-info page. There is no public way to
+     * ask the system whether that is the case, so: Android 15+, and still not granted after the user
+     * came back from the page.
+     */
+    private fun overlayLooksRestricted(): Boolean =
+        Build.VERSION.SDK_INT >= RESTRICTED_OVERLAY_SDK && !Settings.canDrawOverlays(activity)
+
+    private fun showRestrictedHelp() {
+        if (activity.isFinishing || activity.isDestroyed) {
+            active = false
+            return
+        }
+        androidx.appcompat.app.AlertDialog.Builder(activity)
+            .setTitle(R.string.setup_restricted_title)
+            .setMessage(R.string.setup_restricted_message)
+            .setCancelable(false)
+            .setPositiveButton(R.string.setup_restricted_open) { _, _ ->
+                // After the app-info page, open the overlay page once more: the switch works now.
+                attempted -= SetupStep.OVERLAY
+                current = null
+                launchFirst()
+            }
+            .setNegativeButton(R.string.setup_restricted_later) { _, _ -> advance() }
+            .show()
     }
 
     private fun askClonePermissions() {
@@ -215,6 +258,8 @@ class SetupFlow(
     }
 
     private companion object {
+        /** Android 15: the first version that restricts the overlay setting for sideloaded apps. */
+        const val RESTRICTED_OVERLAY_SDK = 35
         const val TAG = "SetupFlow"
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
