@@ -49,6 +49,7 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var setupFlow: SetupFlow
     private lateinit var updateUi: UpdateUi
     private lateinit var selectionBar: SelectionActionMode
+    private lateinit var tabs: HomeTabs
     private var checkingUpdates = false
     private var removingApps = false
     private val updateViewModel: UpdateViewModel by viewModels {
@@ -91,6 +92,7 @@ class HomeActivity : AppCompatActivity() {
         binding.list.layoutManager = GridLayoutManager(this, COLUMNS)
         binding.list.adapter = adapter
         binding.retry.setOnClickListener { viewModel.checkEngine() }
+        tabs = HomeTabs(this, binding, onLeaveClones = viewModel::clearSelection, savedState = savedInstanceState)
         setupFlow = SetupFlow(this) { remaining ->
             val text = if (remaining == 0) {
                 getString(R.string.setup_all_set)
@@ -140,6 +142,11 @@ class HomeActivity : AppCompatActivity() {
         // Opening CloneLab again ends an "Exit CloneLab"; onResume's sync then brings the service back.
         if (!dev.clonelab.app.keepalive.ExitCloneLab.inProgress) KeepAlivePrefs(this).clearExited()
         updateViewModel.autoCheck()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        tabs.saveState(outState)
     }
 
     override fun onDestroy() {

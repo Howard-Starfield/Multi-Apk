@@ -275,4 +275,39 @@
     <string name="selection_uninstalled_one">已卸载 1 个分身</string>
     <string name="selection_uninstalled_many">已卸载 %1$d 个分身</string>
     <string name="selection_uninstalled_partial">已卸载 %1$d 个，%2$d 个无法移除</string>
+
+    <string name="tab_clones">分身</string>
+    <string name="tab_tools">工具</string>
+    <string name="tools_batch_uninstall">批量卸载</string>
+    <string name="tools_batch_uninstall_desc">一次卸载手机上的多个已安装应用。</string>
+    <string name="tools_export_apk">导出安装包</string>
+    <string name="tools_export_apk_desc">将已安装应用的安装包保存为文件。</string>
+    <string name="tools_cloned">已分身</string>
+    <string name="tools_version_size">%1$s · %2$s</string>
+    <string name="tools_sort_date">按安装时间排序</string>
+    <string name="tools_show_system">显示系统应用</string>
+    <plurals name="tools_uninstall_confirm">
+        <item quantity="other">卸载 %1$d 个应用？Android 会逐个请你确认。</item>
+    </plurals>
+    <plurals name="tools_uninstall_clones_note">
+        <item quantity="other">其中 %1$d 个在 CloneLab 中有分身。由已安装应用创建的分身与它共用文件，卸载后将无法使用。</item>
+    </plurals>
+    <string name="tools_uninstall_progress">正在卸载第 %1$d 个，共 %2$d 个</string>
+    <string name="tools_uninstall_summary">已卸载 %1$d 个，共 %2$d 个</string>
+    <string name="tools_export_button">导出</string>
+    <string name="tools_export_version">版本 %1$s</string>
+    <string name="tools_export_no_version">版本未知</string>
+    <string name="tools_export_size_files">%1$s，%2$s</string>
+    <plurals name="tools_export_files">
+        <item quantity="other">%1$d 个文件</item>
+    </plurals>
+    <string name="tools_export_split_note">此应用由多个文件组成，将导出为 .apks 压缩包。需要支持分包安装的安装器；仅当单独的基础 APK 能运行时，CloneLab 才能为其创建分身。</string>
+    <string name="tools_export_progress">正在导出 %1$s（%2$s / %3$s）</string>
+    <string name="tools_export_saved">已保存</string>
+    <string name="tools_export_saved_message">已保存为 %1$s</string>
+    <string name="tools_export_share">分享</string>
+    <string name="tools_export_done">完成</string>
+    <string name="tools_export_cancelled">已取消导出</string>
+    <string name="tools_export_failed">导出失败。</string>
+    <string name="tools_export_no_share">没有可用于分享此文件的应用。</string>
 </resources>

@@ -278,4 +278,42 @@
     <string name="selection_uninstalled_one">Uninstalled 1 clone</string>
     <string name="selection_uninstalled_many">Uninstalled %1$d clones</string>
     <string name="selection_uninstalled_partial">Uninstalled %1$d, %2$d could not be removed</string>
+
+    <string name="tab_clones">Clones</string>
+    <string name="tab_tools">Tools</string>
+    <string name="tools_batch_uninstall">Batch uninstall</string>
+    <string name="tools_batch_uninstall_desc">Remove several installed apps from this phone in one go.</string>
+    <string name="tools_export_apk">Export APK</string>
+    <string name="tools_export_apk_desc">Save the installer of an installed app to a file.</string>
+    <string name="tools_cloned">cloned</string>
+    <string name="tools_version_size">%1$s · %2$s</string>
+    <string name="tools_sort_date">Sort by install date</string>
+    <string name="tools_show_system">Show system apps</string>
+    <plurals name="tools_uninstall_confirm">
+        <item quantity="one">Uninstall %1$d app? Android will ask you to confirm each one.</item>
+        <item quantity="other">Uninstall %1$d apps? Android will ask you to confirm each one.</item>
+    </plurals>
+    <plurals name="tools_uninstall_clones_note">
+        <item quantity="one">%1$d of these has clones in CloneLab. Clones made from an installed app share its files and will stop working.</item>
+        <item quantity="other">%1$d of these have clones in CloneLab. Clones made from an installed app share its files and will stop working.</item>
+    </plurals>
+    <string name="tools_uninstall_progress">Uninstalling %1$d of %2$d</string>
+    <string name="tools_uninstall_summary">Uninstalled %1$d of %2$d</string>
+    <string name="tools_export_button">Export</string>
+    <string name="tools_export_version">Version %1$s</string>
+    <string name="tools_export_no_version">Version unknown</string>
+    <string name="tools_export_size_files">%1$s in %2$s</string>
+    <plurals name="tools_export_files">
+        <item quantity="one">%1$d file</item>
+        <item quantity="other">%1$d files</item>
+    </plurals>
+    <string name="tools_export_split_note">This app has several files, so it is exported as an .apks archive. That needs a split-APK installer; CloneLab can clone it only if the base APK works alone.</string>
+    <string name="tools_export_progress">Exporting %1$s (%2$s of %3$s)</string>
+    <string name="tools_export_saved">Saved</string>
+    <string name="tools_export_saved_message">Saved as %1$s</string>
+    <string name="tools_export_share">Share</string>
+    <string name="tools_export_done">Done</string>
+    <string name="tools_export_cancelled">Export cancelled</string>
+    <string name="tools_export_failed">The export failed.</string>
+    <string name="tools_export_no_share">No app can share this file.</string>
 </resources>
