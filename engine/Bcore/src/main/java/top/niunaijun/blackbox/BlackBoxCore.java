@@ -1018,7 +1018,16 @@ public class BlackBoxCore extends ClientConfiguration {
     }
 
     public void startActivity(Intent intent, int userId) {
-        if (mClientConfiguration.isEnableLauncherActivity()) {
+        // The splash screen only covers a cold start. A clone that is already running is brought
+        // straight to the front, so switching between clones is a single transition.
+        boolean alreadyRunning = false;
+        try {
+            String pkg = intent.getPackage() != null ? intent.getPackage()
+                    : (intent.getComponent() != null ? intent.getComponent().getPackageName() : null);
+            alreadyRunning = pkg != null && isPackageRunning(pkg, userId);
+        } catch (Throwable ignored) {
+        }
+        if (mClientConfiguration.isEnableLauncherActivity() && !alreadyRunning) {
             LauncherActivity.launch(intent, userId);
         } else {
             getBActivityManager().startActivity(intent, userId);

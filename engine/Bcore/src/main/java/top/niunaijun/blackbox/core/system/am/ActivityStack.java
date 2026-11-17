@@ -142,7 +142,7 @@ public class ActivityStack {
             return startActivityInNewTaskLocked(userId, intent, activityInfo, resultTo, launchModeFlags);
         }
         
-        mAms.moveTaskToFront(taskRecord.id, 0);
+        mAms.moveTaskToFront(taskRecord.id, 0, top.niunaijun.blackbox.utils.SwitchAnimation.options());
 
         boolean notStartToFront = false;
         if (clearTop || singleTop || clearTask) {
@@ -286,7 +286,7 @@ public class ActivityStack {
         shadow.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         shadow.addFlags(launchMode);
 
-        BlackBoxCore.getContext().startActivity(shadow);
+        BlackBoxCore.getContext().startActivity(shadow, top.niunaijun.blackbox.utils.SwitchAnimation.options());
         return 0;
     }
 

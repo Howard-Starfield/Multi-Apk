@@ -35,7 +35,7 @@ public class LauncherActivity extends Activity {
             splash.putExtra(LauncherActivity.KEY_INTENT, intent);
             splash.putExtra(LauncherActivity.KEY_PKG, intent.getPackage());
             splash.putExtra(LauncherActivity.KEY_USER_ID, userId);
-            BlackBoxCore.getContext().startActivity(splash);
+            BlackBoxCore.getContext().startActivity(splash, top.niunaijun.blackbox.utils.SwitchAnimation.options());
             Slog.d(TAG, "LauncherActivity.launch() called for package: " + intent.getPackage());
         } catch (Exception e) {
             Slog.e(TAG, "Error in LauncherActivity.launch()", e);

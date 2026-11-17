@@ -44,3 +44,4 @@ Record every local change to these modules in the "Local changes" list below.
 - `BlackBoxCore.isEngineAlive()` is a pure probe of the cached package-manager binder in `mServices` (no restart, no sleep); false when nothing is cached.
 - `InnerReceiverDelegate.finishSkipped` falls back to `ActivityManagerNative.getDefault()` when `ActivityManager.getService()` is missing (API 21-25).
 - `IOCore.redirectPath(String)` normalises absolute paths textually (`normalizePath`: `.`, `..`, duplicate slashes) before the exempt and redirect lookups, so `/sdcard/DCIM/../Foo` no longer escapes redirection.
+- Clone switching: bringing a clone to the front uses a fade-and-grow transition (`res/anim/bb_clone_enter`, `bb_clone_exit`, `utils/SwitchAnimation`) for `moveTaskToFront`, new-task launches and the splash; `BlackBoxCore.startActivity` skips the splash activity when the clone is already running.
