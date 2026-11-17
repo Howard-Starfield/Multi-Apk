@@ -6,6 +6,7 @@ import android.content.Context
 import android.os.Bundle
 import dev.clonelab.app.macro.RecorderHook
 import dev.clonelab.app.switcher.CloneLabForeground
+import dev.clonelab.app.update.UpdateFiles
 import top.niunaijun.blackbox.BlackBoxCore
 import top.niunaijun.blackbox.app.BActivityThread
 import top.niunaijun.blackbox.app.configuration.AppLifecycleCallback
@@ -41,6 +42,7 @@ class CloneLabApp : Application() {
         BlackBoxCore.get().doCreate()
         installRecorderHook()
         cleanStaleRecordings()
+        cleanUpdates()
         // Main process only: clone activities live in other processes and must not count as CloneLab on screen.
         if (BlackBoxCore.get().isMainProcess) CloneLabForeground.install(this)
     }
@@ -59,6 +61,19 @@ class CloneLabApp : Application() {
                 // best effort; the clones also ignore a flag that is not refreshed
             }
         }, "macro-stale-cleanup").apply { isDaemon = true }.start()
+    }
+
+    /** Main process only: downloaded updates that are installed already (or partial) are not kept. */
+    private fun cleanUpdates() {
+        if (!BlackBoxCore.get().isMainProcess) return
+        Thread({
+            try {
+                UpdateFiles.cleanUp(UpdateFiles.dir(this), BuildConfig.VERSION_NAME)
+                UpdateFiles.cleanUp(UpdateFiles.legacyDir(this), BuildConfig.VERSION_NAME)
+            } catch (e: Exception) {
+                // best effort
+            }
+        }, "update-cleanup").apply { isDaemon = true }.start()
     }
 
     /**

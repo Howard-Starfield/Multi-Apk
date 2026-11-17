@@ -20,6 +20,7 @@ import dev.clonelab.app.keepalive.SetupBanner
 import dev.clonelab.app.keepalive.SetupFlow
 import dev.clonelab.app.keepalive.SetupStatusReader
 import dev.clonelab.app.switcher.SwitcherPrefs
+import dev.clonelab.app.BuildConfig
 import dev.clonelab.app.R
 import dev.clonelab.app.ServiceLocator
 import dev.clonelab.app.databinding.ActivityHomeBinding
@@ -28,6 +29,14 @@ import dev.clonelab.app.keepalive.KeepAliveController
 import dev.clonelab.app.ui.AppVisuals
 import dev.clonelab.app.ui.add.AddCloneActivity
 import dev.clonelab.app.ui.group.CloneGroupActivity
+import dev.clonelab.app.update.UpdateChecker
+import dev.clonelab.app.update.UpdateDownloader
+import dev.clonelab.app.update.UpdateFiles
+import dev.clonelab.app.update.UpdateInstaller
+import dev.clonelab.app.update.UpdatePrefs
+import dev.clonelab.app.update.UpdateUi
+import dev.clonelab.app.update.UpdateViewModel
+import dev.clonelab.app.update.ReleaseInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,6 +46,22 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var binding: ActivityHomeBinding
     private lateinit var adapter: AppGroupAdapter
     private lateinit var setupFlow: SetupFlow
+    private lateinit var updateUi: UpdateUi
+    private val updateViewModel: UpdateViewModel by viewModels {
+        viewModelFactory {
+            initializer {
+                val app = applicationContext
+                UpdateViewModel(
+                    UpdateChecker(BuildConfig.VERSION_NAME),
+                    UpdateDownloader(UpdateFiles.dir(app)),
+                    UpdateInstaller(app),
+                    UpdatePrefs(app),
+                    BuildConfig.VERSION_NAME,
+                    System::currentTimeMillis,
+                )
+            }
+        }
+    }
     private val viewModel: HomeViewModel by viewModels {
         viewModelFactory {
             initializer { HomeViewModel(ServiceLocator.repository(applicationContext), ServiceLocator.engine()) }
@@ -65,6 +90,10 @@ class HomeActivity : AppCompatActivity() {
             renderSetupBanner()
         }
         binding.setupFix.setOnClickListener { setupFlow.start() }
+        updateUi = UpdateUi(this, updateViewModel, binding.root)
+        updateUi.start()
+        binding.updateAction.setOnClickListener { updateViewModel.openDialog() }
+        binding.updateDismiss.setOnClickListener { updateViewModel.dismissBanner() }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -77,6 +106,10 @@ class HomeActivity : AppCompatActivity() {
                         binding.banner.visibility = if (state.engineFailed) View.VISIBLE else View.GONE
                     }
                 }
+                launch { updateViewModel.banner.collect(::renderUpdateBanner) }
+                launch {
+                    updateViewModel.checking.collect { binding.updateProgress.visibility = if (it) View.VISIBLE else View.GONE }
+                }
                 launch {
                     viewModel.messages.collect { Snackbar.make(binding.root, it.resolve(this@HomeActivity), Snackbar.LENGTH_LONG).show() }
                 }
@@ -88,6 +121,17 @@ class HomeActivity : AppCompatActivity() {
         super.onStart()
         // Opening CloneLab again ends an "Exit CloneLab"; onResume's sync then brings the service back.
         if (!dev.clonelab.app.keepalive.ExitCloneLab.inProgress) KeepAlivePrefs(this).clearExited()
+        updateViewModel.autoCheck()
+    }
+
+    override fun onDestroy() {
+        updateUi.close()
+        super.onDestroy()
+    }
+
+    private fun renderUpdateBanner(release: ReleaseInfo?) {
+        binding.updateBanner.visibility = if (release == null) View.GONE else View.VISIBLE
+        if (release != null) binding.updateBannerText.text = getString(R.string.update_banner, release.version)
     }
 
     override fun onResume() {
@@ -134,6 +178,7 @@ class HomeActivity : AppCompatActivity() {
                 // The service refreshes its notifications on every start command (and cancels them when off).
                 KeepAliveController.sync(applicationContext)
             }
+            R.id.action_check_updates -> updateViewModel.checkManually()
             R.id.action_exit -> confirmExit()
             else -> return super.onOptionsItemSelected(item)
         }

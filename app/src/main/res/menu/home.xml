@@ -12,6 +12,10 @@
         android:title="@string/home_show_running"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_check_updates"
+        android:title="@string/home_check_updates"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_exit"
         android:title="@string/home_exit"
         app:showAsAction="never" />

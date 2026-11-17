@@ -22,6 +22,17 @@ is required by the engine.
   from a file until you allow it once: Settings, Apps, CloneLab, the menu in
   the top-right corner, "Allow restricted settings". The app walks you through it.
 
+## Updating
+
+New releases are picked up in the app: it checks GitHub about once a day (and
+on "Check for updates" in the Home menu) and shows a banner when a newer
+release exists. Tapping "Update" downloads the APK and hands it to the system
+installer; Android always asks you to confirm, and the first time it asks you
+to allow CloneLab to install apps. An update only installs over the current app
+if it is signed with the same key, so every release build must use the same
+signing key. The version in `app/build.gradle` (`versionName`, `versionCode`)
+and the release tag (`v0.2.0`) must be raised together.
+
 ## Layout
 
 | Path | What |

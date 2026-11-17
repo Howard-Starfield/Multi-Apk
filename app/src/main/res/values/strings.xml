@@ -239,4 +239,31 @@
     <string name="setup_restricted_message">If the \"Display over other apps\" switch was greyed out: Android 15 restricts it for apps installed from a file, until you allow it once.\n\n1. Tap \"Open app info\".\n2. Tap the ⋮ menu in the top-right corner.\n3. Choose \"Allow restricted settings\" and confirm with your screen lock.\n4. Go back. The switch will work now.\n\nNo such menu item? Tap the greyed-out switch once so Android shows its warning, then look again.</string>
     <string name="setup_restricted_open">Open app info</string>
     <string name="setup_restricted_later">Later</string>
+
+    <string name="home_check_updates">Check for updates</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_up_to_date">CloneLab is up to date (%1$s)</string>
+    <string name="update_check_failed">Could not check for updates. Try again later.</string>
+    <string name="update_banner">CloneLab %1$s is available</string>
+    <string name="update_banner_action">Update</string>
+    <string name="update_banner_dismiss">Dismiss</string>
+    <string name="update_title">CloneLab %1$s is available</string>
+    <string name="update_size">Download size: %1$.1f MB</string>
+    <string name="update_no_notes">No release notes.</string>
+    <string name="update_download_install">Download and install</string>
+    <string name="update_later">Later</string>
+    <string name="update_view_github">View on GitHub</string>
+    <string name="update_progress">Downloading… %1$.1f of %2$.1f MB</string>
+    <string name="update_progress_unknown">Downloading… %1$.1f MB</string>
+    <string name="update_error_network">The download failed. Check your connection and try again.</string>
+    <string name="update_error_server">GitHub did not provide the update. Try again later.</string>
+    <string name="update_error_url">The update is not hosted on GitHub, so it was not downloaded.</string>
+    <string name="update_error_size">The download is incomplete. Try again.</string>
+    <string name="update_error_storage">The update could not be saved on this phone.</string>
+    <string name="update_error_not_newer">The downloaded file is not a newer CloneLab.</string>
+    <string name="update_error_permission">CloneLab is still not allowed to install apps, so the update was not installed.</string>
+    <string name="update_error_installer">The system installer could not be opened.</string>
+    <string name="update_permission_title">Allow installing updates</string>
+    <string name="update_permission_message">Android needs your permission before CloneLab can install its own update. On the next screen, turn on "Allow from this source", then come back.</string>
+    <string name="update_permission_open">Open settings</string>
 </resources>
