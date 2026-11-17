@@ -418,6 +418,7 @@ public class BActivityThread extends IBActivityThread.Stub {
         }
 
         NativeCore.init(Build.VERSION.SDK_INT);
+        NativeCore.refreshServerPid();
         try {
             DeviceProfileApplier.apply(BDeviceManager.get().getProfile(getUserId(), packageName));
         } catch (Throwable e) {

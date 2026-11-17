@@ -357,6 +357,26 @@ public class BActivityManager extends BlackManager<IBActivityManagerService> {
      * The clone whose activity is currently resumed, as "userId:packageName", or null when
      * no clone is in the foreground.
      */
+    /** App id of the clone process with this pid, or -1 if it is not a clone process. */
+    public int getUidByPid(int pid) {
+        try {
+            IBActivityManagerService service = getService();
+            return service == null ? -1 : service.getUidByPid(pid);
+        } catch (Throwable e) {
+            return -1;
+        }
+    }
+
+    /** Pid of the engine's server process, or -1 if it cannot be reached. */
+    public int getServerPid() {
+        try {
+            IBActivityManagerService service = getService();
+            return service == null ? -1 : service.getServerPid();
+        } catch (Throwable e) {
+            return -1;
+        }
+    }
+
     public String getFocusedClone() {
         try {
             IBActivityManagerService service = getService();

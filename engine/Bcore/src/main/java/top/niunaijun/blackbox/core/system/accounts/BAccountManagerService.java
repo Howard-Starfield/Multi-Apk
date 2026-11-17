@@ -588,7 +588,7 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
         final String callerPkg = loginOptions.getString(AccountManager.KEY_ANDROID_PACKAGE_NAME);
 
         
-        loginOptions.putInt(AccountManager.KEY_CALLER_UID, Binder.getCallingUid());
+        loginOptions.putInt(AccountManager.KEY_CALLER_UID, callerVirtualUid());
         loginOptions.putInt(AccountManager.KEY_CALLER_PID, Binder.getCallingPid());
 
         if (notifyOnAuthFailure) {
@@ -710,8 +710,9 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
 
 
         final Bundle options = (optionsIn == null) ? new Bundle() : optionsIn;
-
-
+        // As the real account service does: tell the authenticator which app is asking.
+        options.putInt(AccountManager.KEY_CALLER_UID, callerVirtualUid());
+        options.putInt(AccountManager.KEY_CALLER_PID, Binder.getCallingPid());
 
         BUserAccounts accounts = getUserAccounts(userId);
         new Session(accounts, response, accountType, expectActivityLaunch,
@@ -730,6 +731,23 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
                         + ", requiredFeatures " + Arrays.toString(requiredFeatures);
             }
         }.bind();
+    }
+
+    /**
+     * The uid a clone's package manager reports for the calling clone process (its app id), so the
+     * authenticator can look the caller up. Falls back to the real uid for a caller that is not a
+     * clone process.
+     */
+    private static int callerVirtualUid() {
+        try {
+            top.niunaijun.blackbox.core.system.ProcessRecord caller =
+                    top.niunaijun.blackbox.core.system.BProcessManagerService.get().findProcessByPid(Binder.getCallingPid());
+            if (caller != null) {
+                return caller.buid;
+            }
+        } catch (Throwable ignored) {
+        }
+        return Binder.getCallingUid();
     }
 
     @Override

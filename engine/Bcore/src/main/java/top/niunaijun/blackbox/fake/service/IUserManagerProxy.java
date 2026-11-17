@@ -35,6 +35,35 @@ public class IUserManagerProxy extends BinderInvocationStub {
         return false;
     }
 
+    /**
+     * Most user-manager queries need permissions only system apps hold, and the system refuses
+     * them for a clone with a SecurityException that the app does not expect (on a real device it
+     * would hold the permission, or run as the system). Answer those with an empty result instead
+     * of letting the exception crash the clone.
+     */
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        try {
+            return super.invoke(proxy, method, args);
+        } catch (SecurityException e) {
+            android.util.Log.w("IUserManagerProxy", method.getName() + " refused by the system; answering with an empty result");
+            return emptyResult(method.getReturnType());
+        }
+    }
+
+    private static Object emptyResult(Class<?> type) {
+        if (type == boolean.class) return false;
+        if (type == int.class) return 0;
+        if (type == long.class) return 0L;
+        if (type == float.class) return 0f;
+        if (type == double.class) return 0d;
+        if (type == java.util.List.class) return new ArrayList<>();
+        if (type == int[].class) return new int[0];
+        if (type == long[].class) return new long[0];
+        if (type == String[].class) return new String[0];
+        return null;
+    }
+
     @ProxyMethod("getApplicationRestrictions")
     public static class GetApplicationRestrictions extends MethodHook {
         @Override
@@ -54,6 +83,18 @@ public class IUserManagerProxy extends BinderInvocationStub {
         @Override
         protected Object hook(Object who, Method method, Object[] args) throws Throwable {
             return new android.os.Bundle();
+        }
+    }
+
+    /**
+     * Asking about a user needs a permission only system apps hold. A clone lives in a single
+     * (virtual) primary user, so describe that one.
+     */
+    @ProxyMethod("getUserInfo")
+    public static class GetUserInfo extends MethodHook {
+        @Override
+        protected Object hook(Object who, Method method, Object[] args) throws Throwable {
+            return BRUserInfo.get()._new(BlackBoxCore.getHostUserId(), "BlackBox", BRUserInfo.get().FLAG_PRIMARY());
         }
     }
 

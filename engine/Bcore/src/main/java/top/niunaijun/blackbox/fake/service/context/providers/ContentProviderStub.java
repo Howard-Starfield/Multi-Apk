@@ -42,6 +42,18 @@ public class ContentProviderStub extends ClassInvocationStub implements BContent
 
     }
 
+    /**
+     * The uid to state as the caller. A provider that belongs to the phone itself is called with
+     * the host's real uid. A provider of a clone sees this process's app id as the calling uid, so
+     * that is what must be stated, or Android 12+ rejects the call as a uid mismatch.
+     */
+    private int statedUid() {
+        if (mAppPkg == null || mAppPkg.equals(BlackBoxCore.getHostPkg())) {
+            return BlackBoxCore.getHostUid();
+        }
+        return top.niunaijun.blackbox.app.BActivityThread.getBUid();
+    }
+
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         if ("asBinder".equals(method.getName())) {
@@ -55,7 +67,7 @@ public class ContentProviderStub extends ClassInvocationStub implements BContent
         
         if ("call".equals(methodName)) {
             
-            AttributionSourceUtils.fixAttributionSourceInArgs(args);
+            AttributionSourceUtils.fixAttributionSourceInArgs(args, statedUid());
         } else {
             
             if (args != null && args.length > 0) {
@@ -71,7 +83,7 @@ public class ContentProviderStub extends ClassInvocationStub implements BContent
                     }
                 }
                 
-                AttributionSourceUtils.fixAttributionSourceInArgs(args);
+                AttributionSourceUtils.fixAttributionSourceInArgs(args, statedUid());
             }
         }
         

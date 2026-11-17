@@ -134,6 +134,17 @@ public class BActivityManagerService extends IBActivityManagerService.Stub imple
     }
 
     @Override
+    public int getUidByPid(int pid) throws RemoteException {
+        ProcessRecord record = BProcessManagerService.get().findProcessByPid(pid);
+        return record == null ? -1 : record.buid;
+    }
+
+    @Override
+    public int getServerPid() throws RemoteException {
+        return android.os.Process.myPid();
+    }
+
+    @Override
     public String getFocusedClone() throws RemoteException {
         synchronized (mFocusLock) {
             if (mFocusProcess == null) {

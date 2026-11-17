@@ -41,9 +41,100 @@ public class NativeCore {
     public static native void setSpoofProps(String[] keys, String[] values);
 
 
+    // The engine's server process plays the part of the system for clones: it hosts their
+    // activity, package and account managers. Calls it makes into a clone are reported as coming
+    // from the system uid, as they would on a real device. Google Play services, for one, only
+    // lets the system (or Google's own apps) drive its account authenticator.
+    private static volatile int sServerPid = -1;
+    private static volatile long sServerPidCheckedAt;
+    private static final long SERVER_PID_TTL_MS = 30_000;
+
+    /** Looks the server pid up off the calling thread; safe to call often. */
+    public static void refreshServerPid() {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (sServerPid > 0 && now - sServerPidCheckedAt < SERVER_PID_TTL_MS) {
+            return;
+        }
+        sServerPidCheckedAt = now;
+        Thread thread = new Thread(() -> {
+            try {
+                int pid = BlackBoxCore.getBActivityManager().getServerPid();
+                if (pid > 0) {
+                    sServerPid = pid;
+                }
+            } catch (Throwable ignored) {
+            }
+        }, "bb-server-pid");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private static final java.util.concurrent.ConcurrentHashMap<Integer, long[]> sPidUids =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long PID_UID_TTL_MS = 60_000;
+    private static final ThreadLocal<Boolean> sResolvingPid = new ThreadLocal<>();
+
+    /** App id of the clone process [pid], or -1. Cached briefly, since pids are reused. */
+    private static int virtualUidOfPid(int pid) {
+        if (pid <= 0) {
+            return -1;
+        }
+        long now = android.os.SystemClock.elapsedRealtime();
+        long[] cached = sPidUids.get(pid);
+        if (cached != null && now - cached[1] < PID_UID_TTL_MS) {
+            return (int) cached[0];
+        }
+        if (Boolean.TRUE.equals(sResolvingPid.get())) {
+            return -1; // the lookup itself must never recurse into this hook
+        }
+        sResolvingPid.set(Boolean.TRUE);
+        try {
+            int uid = BlackBoxCore.getBActivityManager().getUidByPid(pid);
+            if (sPidUids.size() > 256) {
+                sPidUids.clear();
+            }
+            sPidUids.put(pid, new long[]{uid, now});
+            return uid;
+        } catch (Throwable t) {
+            return -1;
+        } finally {
+            sResolvingPid.set(Boolean.FALSE);
+        }
+    }
+
+    private static boolean isCallFromEngineServer() {
+        int serverPid = sServerPid;
+        if (android.os.SystemClock.elapsedRealtime() - sServerPidCheckedAt >= SERVER_PID_TTL_MS) {
+            refreshServerPid();
+        }
+        return serverPid > 0 && android.os.Binder.getCallingPid() == serverPid
+                && serverPid != Process.myPid();
+    }
+
     @Keep
     public static int getCallingUid(int origCallingUid) {
         try {
+            if (origCallingUid == BlackBoxCore.getHostUid() && BlackBoxCore.get().isBlackProcess()
+                    && isCallFromEngineServer()) {
+                return Process.SYSTEM_UID;
+            }
+            // Not inside an incoming call (or the app cleared the calling identity): the caller
+            // is this process itself. Report the same uid Process.myUid() gives, as on a real
+            // device; apps compare the two to recognise their own calls.
+            if (origCallingUid == BlackBoxCore.getHostUid() && BlackBoxCore.get().isBlackProcess()
+                    && android.os.Binder.getCallingPid() == Process.myPid()) {
+                return origCallingUid;
+            }
+            // A call from another clone process: report that process's own app id, the uid its
+            // package has in a clone's package manager. (It used to be the app id of whichever
+            // process happened to start this one, which is wrong for every other caller and
+            // fails Android 12's check that a caller's stated identity matches the real one.)
+            if (origCallingUid == BlackBoxCore.getHostUid() && BlackBoxCore.get().isBlackProcess()) {
+                int virtualUid = virtualUidOfPid(android.os.Binder.getCallingPid());
+                if (virtualUid > 0) {
+                    return virtualUid;
+                }
+            }
             
             if (origCallingUid > 0 && origCallingUid < Process.FIRST_APPLICATION_UID)
                 return origCallingUid;

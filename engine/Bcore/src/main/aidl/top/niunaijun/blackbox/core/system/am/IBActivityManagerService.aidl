@@ -45,6 +45,8 @@ interface IBActivityManagerService {
     void onActivityResumed(IBinder token);
     void onActivityPaused(IBinder token);
     String getFocusedClone();
+    int getServerPid();
+    int getUidByPid(int pid);
     void onActivityDestroyed(IBinder token);
     void onFinishActivity(IBinder token);
 

@@ -9,6 +9,27 @@ public class AttributionSourceUtils {
     private static final String TAG = "AttributionSourceUtils";
 
     
+    private static final ThreadLocal<Integer> sTargetUid = new ThreadLocal<>();
+
+    /**
+     * Like {@link #fixAttributionSourceInArgs(Object[])}, but states [uid] as the caller's uid.
+     * Used for calls into another clone's provider, where the receiving side sees this process's
+     * app id as the calling uid.
+     */
+    public static void fixAttributionSourceInArgs(Object[] args, int uid) {
+        sTargetUid.set(uid);
+        try {
+            fixAttributionSourceInArgs(args);
+        } finally {
+            sTargetUid.remove();
+        }
+    }
+
+    private static int targetUid() {
+        Integer uid = sTargetUid.get();
+        return uid != null ? uid : BlackBoxCore.getHostUid();
+    }
+
     public static void fixAttributionSourceInArgs(Object[] args) {
         if (args == null) return;
         
@@ -43,15 +64,29 @@ public class AttributionSourceUtils {
             if (attributionSource == null) return;
             
             Class<?> attributionSourceClass = attributionSource.getClass();
-            
-            
+
+            // Android 12+: the uid lives in the wrapped AttributionSourceState, not in a field of
+            // AttributionSource itself. Without this the "fix" below silently changed nothing.
+            try {
+                java.lang.reflect.Field stateField = attributionSourceClass.getDeclaredField("mAttributionSourceState");
+                stateField.setAccessible(true);
+                Object state = stateField.get(attributionSource);
+                if (state != null) {
+                    java.lang.reflect.Field uid = state.getClass().getField("uid");
+                    uid.setInt(state, targetUid());
+                    return;
+                }
+            } catch (Throwable ignored) {
+                // Older layout: fall through to the field names below.
+            }
+
             String[] uidFieldNames = {"mUid", "uid", "mCallingUid", "callingUid", "mSourceUid", "sourceUid"};
             
             for (String fieldName : uidFieldNames) {
                 try {
                     java.lang.reflect.Field uidField = attributionSourceClass.getDeclaredField(fieldName);
                     uidField.setAccessible(true);
-                    uidField.set(attributionSource, BlackBoxCore.getHostUid());
+                    uidField.set(attributionSource, targetUid());
                     Slog.d(TAG, "Fixed AttributionSource UID via field: " + fieldName);
                     break;
                 } catch (NoSuchFieldException e) {
@@ -63,7 +98,7 @@ public class AttributionSourceUtils {
             try {
                 java.lang.reflect.Method setUidMethod = attributionSourceClass.getDeclaredMethod("setUid", int.class);
                 setUidMethod.setAccessible(true);
-                setUidMethod.invoke(attributionSource, BlackBoxCore.getHostUid());
+                setUidMethod.invoke(attributionSource, targetUid());
                 Slog.d(TAG, "Fixed AttributionSource UID via setter method");
             } catch (Exception e) {
                 
