@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="daemon_notification_title">分身引擎运行中</string>
+    <string name="daemon_notification_text">保持分身在后台运行</string>
+</resources>

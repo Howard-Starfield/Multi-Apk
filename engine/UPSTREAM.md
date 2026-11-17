@@ -50,3 +50,4 @@ Record every local change to these modules in the "Local changes" list below.
 - `BAccountManagerService`: `BUserAccounts.userId` was never set (always 0), so authenticator binds (`_B_|_UserId`), `checkKeyIntent` and the token cache of every virtual user addressed user 0. `getUserAccounts`/`loadAccounts` now set it from the map key.
 - `BAccountManagerService.loadAuthenticatorCache(pkg)` cleared the whole authenticator cache and kept only `pkg`'s authenticators, so installing any app dropped the Google (`com.google`) authenticator; it now replaces only that package's entries.
 - `BAccountManagerService.onPackageUninstalled`: uninstalling `com.google.android.gms` from a user removes that user's `com.google*` accounts and their cached tokens (other users untouched).
+- Added `res/values-zh/strings.xml` with Chinese text for the daemon notification.
