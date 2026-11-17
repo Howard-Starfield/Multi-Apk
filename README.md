@@ -5,7 +5,22 @@ app on one phone. Each copy can be renamed, given its own icon and home-screen
 shortcut, kept alive in the background, and given its own location and device
 profile.
 
-Status: builds and passes its unit tests. Not yet run on a device.
+Status: early and experimental. Tested by hand on two phones (Android 11 and
+Android 15), mostly with one app.
+
+## Download
+
+Get the APK from the [latest release](https://github.com/Howard-Starfield/Multi-Apk/releases/latest)
+and open it on the phone. Android will ask you to allow installing from that
+source, and may warn that the app targets an old Android version; that target
+is required by the engine.
+
+- Phones: Android 5 or later, ARM (64- or 32-bit).
+- It is a debug-signed build, not a store release. A later build installs over
+  it only if it is signed with the same key.
+- On Android 15, "Display over other apps" is greyed out for apps installed
+  from a file until you allow it once: Settings, Apps, CloneLab, the menu in
+  the top-right corner, "Allow restricted settings". The app walks you through it.
 
 ## Layout
 
