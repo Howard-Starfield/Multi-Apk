@@ -266,4 +266,6 @@
     <string name="update_permission_title">Allow installing updates</string>
     <string name="update_permission_message">Android needs your permission before CloneLab can install its own update. On the next screen, turn on "Allow from this source", then come back.</string>
     <string name="update_permission_open">Open settings</string>
+
+    <string name="clone_settings">Clone settings</string>
 </resources>

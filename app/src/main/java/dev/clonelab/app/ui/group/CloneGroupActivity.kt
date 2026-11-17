@@ -53,6 +53,7 @@ class CloneGroupActivity : AppCompatActivity() {
         adapter = CloneAdapter(
             onClick = ::onCloneClicked,
             onLongClick = ::openDetail,
+            onSettings = ::openDetail,
             onAdd = viewModel::addClone,
             addCaption = R.string.home_add_clone,
             onDragStart = { touchHelper.startDrag(it) },

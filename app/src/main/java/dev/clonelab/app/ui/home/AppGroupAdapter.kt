@@ -58,6 +58,7 @@ class AppGroupAdapter(
             countBadge.visibility = View.VISIBLE
             runningDot.visibility = if (group.anyRunning) View.VISIBLE else View.GONE
             root.alpha = 1f
+            settingsButton.visibility = View.GONE
             root.setOnClickListener { onAppClick(group) }
             root.setOnLongClickListener(null)
             root.isLongClickable = false

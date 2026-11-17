@@ -1,7 +1,9 @@
 package dev.clonelab.app.ui.home
 
-import android.view.LayoutInflater
 import android.annotation.SuppressLint
+import android.graphics.Rect
+import android.view.LayoutInflater
+import android.view.TouchDelegate
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -17,6 +19,7 @@ import dev.clonelab.app.ui.AppVisuals
 class CloneAdapter(
     private val onClick: (CloneItem) -> Unit,
     private val onLongClick: (CloneItem) -> Unit,
+    private val onSettings: (CloneItem) -> Unit,
     private val onAdd: () -> Unit,
     @StringRes private val addCaption: Int,
     private val onDragStart: (Holder) -> Unit = {},
@@ -63,7 +66,26 @@ class CloneAdapter(
 
     fun order(): List<CloneId> = working.map { it.record.id }
 
-    class Holder(val binding: ItemCloneBinding) : RecyclerView.ViewHolder(binding.root)
+    class Holder(val binding: ItemCloneBinding) : RecyclerView.ViewHolder(binding.root) {
+        init {
+            // The 22dp button gets a 36dp touch target without changing the tile's layout.
+            binding.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> updateSettingsTouchTarget() }
+        }
+
+        fun updateSettingsTouchTarget() {
+            val root = binding.root
+            val button = binding.settingsButton
+            if (button.visibility != View.VISIBLE || button.width == 0) {
+                root.touchDelegate = null
+                return
+            }
+            val rect = Rect(0, 0, button.width, button.height)
+            root.offsetDescendantRectToMyCoords(button, rect)
+            val extra = ((MIN_TOUCH_TARGET_DP - SETTINGS_BUTTON_DP) / 2 * root.resources.displayMetrics.density).toInt()
+            rect.inset(-extra, -extra)
+            root.touchDelegate = TouchDelegate(rect, button)
+        }
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder =
         if (viewType == AddTileHolder.VIEW_TYPE) {
@@ -90,6 +112,10 @@ class CloneAdapter(
             }
             root.alpha = if (item.installed) 1f else 0.5f
             runningDot.visibility = if (item.running) View.VISIBLE else View.GONE
+            // Not while reordering; works for broken clones too (it is how their details are reached from the corner).
+            settingsButton.visibility = if (reorderMode) View.GONE else View.VISIBLE
+            settingsButton.setOnClickListener { onSettings(item) }
+            holder.updateSettingsTouchTarget()
             if (reorderMode) {
                 root.setOnClickListener(null)
                 root.setOnLongClickListener(null)
@@ -107,6 +133,8 @@ class CloneAdapter(
 
     private companion object {
         const val CLONE_VIEW_TYPE = 0
+        const val SETTINGS_BUTTON_DP = 22f
+        const val MIN_TOUCH_TARGET_DP = 36f
     }
 
     private object Diff : DiffUtil.ItemCallback<CloneItem>() {

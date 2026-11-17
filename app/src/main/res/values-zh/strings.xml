@@ -263,4 +263,6 @@
     <string name="update_permission_title">允许安装更新</string>
     <string name="update_permission_message">CloneLab 安装自身的更新前，需要你的许可。在下一个页面中打开“允许来自此来源的应用”，然后返回。</string>
     <string name="update_permission_open">打开设置</string>
+
+    <string name="clone_settings">分身设置</string>
 </resources>
