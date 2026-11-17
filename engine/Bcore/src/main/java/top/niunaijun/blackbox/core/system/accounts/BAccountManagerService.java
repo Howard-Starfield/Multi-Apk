@@ -63,6 +63,7 @@ import top.niunaijun.blackbox.core.system.ISystemService;
 import top.niunaijun.blackbox.core.system.ProcessRecord;
 import top.niunaijun.blackbox.core.system.pm.BPackageManagerService;
 import top.niunaijun.blackbox.core.system.pm.PackageMonitor;
+import top.niunaijun.blackbox.core.GmsCore;
 import top.niunaijun.blackbox.core.system.user.BUserHandle;
 import top.niunaijun.blackbox.utils.ArrayUtils;
 import top.niunaijun.blackbox.utils.CloseUtils;
@@ -112,6 +113,50 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
     @Override
     public void onPackageUninstalled(String packageName, boolean isRemove, int userId) {
         loadAuthenticatorCache(null);
+        if (GmsCore.GMS_PKG.equals(packageName)) {
+            // The user's virtual Google services are gone: so are the Google accounts they created.
+            removeGoogleAccounts(userId);
+        }
+    }
+
+    private static boolean isGoogleAccountType(String type) {
+        return type != null && type.startsWith("com.google");
+    }
+
+    private void removeGoogleAccounts(int userId) {
+        List<BUserAccounts> affected = new ArrayList<>();
+        synchronized (mUserAccountsMap) {
+            for (Map.Entry<Integer, BUserAccounts> entry : mUserAccountsMap.entrySet()) {
+                if (userId == BUserHandle.USER_ALL || entry.getKey() == userId) {
+                    affected.add(entry.getValue());
+                }
+            }
+        }
+        boolean changed = false;
+        for (BUserAccounts userAccounts : affected) {
+            synchronized (userAccounts.lock) {
+                Iterator<BAccount> iterator = userAccounts.accounts.iterator();
+                while (iterator.hasNext()) {
+                    if (isGoogleAccountType(iterator.next().account.type)) {
+                        iterator.remove();
+                        changed = true;
+                    }
+                }
+            }
+        }
+        synchronized (mTokenCaches) {
+            Iterator<TokenCache> iterator = mTokenCaches.iterator();
+            while (iterator.hasNext()) {
+                TokenCache next = iterator.next();
+                if ((userId == BUserHandle.USER_ALL || next.userId == userId)
+                        && isGoogleAccountType(next.account.type)) {
+                    iterator.remove();
+                }
+            }
+        }
+        if (changed) {
+            saveAllAccounts();
+        }
     }
 
     @Override
@@ -138,7 +183,10 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
             synchronized (mUserAccountsMap) {
                 mUserAccountsMap.clear();
                 for (Integer key : accountsMap.keySet()) {
-                    mUserAccountsMap.put(key, accountsMap.get(key));
+                    BUserAccounts loaded = accountsMap.get(key);
+                    // userId was never stored with the data; the map key is the truth.
+                    loaded.userId = key;
+                    mUserAccountsMap.put(key, loaded);
                 }
             }
         } catch (Exception e) {
@@ -1163,7 +1211,9 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
                 bUserAccounts = new BUserAccounts();
                 mUserAccountsMap.put(userId, bUserAccounts);
             }
-            return mUserAccountsMap.get(userId);
+            // Sessions, token caches and authenticator binds read accounts.userId; it used to stay 0.
+            bUserAccounts.userId = userId;
+            return bUserAccounts;
         }
     }
 
@@ -1374,14 +1424,28 @@ public class BAccountManagerService extends IBAccountManagerService.Stub impleme
     }
 
     public void loadAuthenticatorCache(String packageName) {
-        mAuthenticatorCache.authenticators.clear();
         Intent intent = new Intent(AccountManager.ACTION_AUTHENTICATOR_INTENT);
         if (packageName != null) {
             intent.setPackage(packageName);
         }
+        Map<String, AuthenticatorInfo> fresh = new HashMap<>();
         generateServicesMap(
                 mPms.queryIntentServices(intent, PackageManager.GET_META_DATA, BUserHandle.USER_ALL),
-                mAuthenticatorCache.authenticators, new RegisteredServicesParser());
+                fresh, new RegisteredServicesParser());
+        Map<String, AuthenticatorInfo> cache = mAuthenticatorCache.authenticators;
+        if (packageName == null) {
+            cache.clear();
+        } else {
+            // A single package changed: keep every other package's authenticators (this used to
+            // clear them all, so installing any app dropped the Google authenticator).
+            Iterator<AuthenticatorInfo> iterator = cache.values().iterator();
+            while (iterator.hasNext()) {
+                if (packageName.equals(iterator.next().serviceInfo.packageName)) {
+                    iterator.remove();
+                }
+            }
+        }
+        cache.putAll(fresh);
     }
 
     private void generateServicesMap(List<ResolveInfo> services, Map<String, AuthenticatorInfo> map,

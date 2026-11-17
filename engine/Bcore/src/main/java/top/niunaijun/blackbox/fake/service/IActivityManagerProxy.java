@@ -145,13 +145,17 @@ public class IActivityManagerProxy extends ClassInvocationStub {
                     args[1] = BlackBoxCore.getHostPkg();
                 }
 
+                // Google authorities: a virtual user that has its own copy of the Google packages
+                // (GmsCore.installGApps) is served by that copy, exactly like services are; only
+                // when the user has none do we fall through to the phone's real Google services.
+                boolean realGoogle = isGoogleAuthority((String) auth)
+                        && BlackBoxCore.getBPackageManager().resolveContentProvider(
+                                (String) auth, GET_META_DATA, BActivityThread.getUserId()) == null;
+
                 if (auth.equals("settings")
                         || auth.equals("media")
                         || auth.equals("telephony")
-                        || ((String) auth).contains("com.google.android.gms")
-                        || ((String) auth).contains("com.android.vending")
-                        || ((String) auth).contains("com.google.android.gsf")
-                        || auth.equals("com.google.android.gms.chimera")
+                        || realGoogle
                         || auth.equals("com.huawei.android.launcher.settings")
                         || auth.equals("com.hihonor.android.launcher.settings")) {
                     content = method.invoke(who, args);
@@ -202,8 +206,14 @@ public class IActivityManagerProxy extends ClassInvocationStub {
             return method.invoke(who, args);
         }
 
+        private static boolean isGoogleAuthority(String auth) {
+            return auth.contains("com.google.android.gms")
+                    || auth.contains("com.android.vending")
+                    || auth.contains("com.google.android.gsf");
+        }
+
         protected int getAuthIndex() {
-            
+
             if (BuildCompat.isQ()) {
                 return 2;
             } else {

@@ -1,12 +1,18 @@
 package top.niunaijun.blackbox.core;
 
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 import top.niunaijun.blackbox.BlackBoxCore;
 import top.niunaijun.blackbox.entity.pm.InstallResult;
+import top.niunaijun.blackbox.utils.Slog;
 
 
 public class GmsCore {
@@ -47,7 +53,12 @@ public class GmsCore {
         return GOOGLE_APP.contains(str) || GOOGLE_SERVICE.contains(str);
     }
 
-    private static InstallResult installPackages(Set<String> list, int userId) {
+    /**
+     * Installs every Google package the phone has that is not yet in {@code userId}. The packages
+     * installed by this call are appended to {@code installed} so the caller can roll back exactly
+     * those (and not packages the user already had).
+     */
+    private static InstallResult installPackages(Set<String> list, int userId, List<String> installed) {
         BlackBoxCore blackBoxCore = BlackBoxCore.get();
         for (String packageName : list) {
             if (blackBoxCore.isInstalled(packageName, userId)) {
@@ -60,37 +71,70 @@ public class GmsCore {
                 continue;
             }
             InstallResult installResult = blackBoxCore.installPackageAsUser(packageName, userId);
-            if (!installResult.success) {
-                return installResult;
+            if (installResult == null || !installResult.success) {
+                return installResult != null ? installResult
+                        : new InstallResult().installError(packageName, "install returned no result");
             }
+            installed.add(packageName);
         }
         return new InstallResult();
     }
 
-    private static void uninstallPackages(Set<String> list, int userId) {
+    private static void uninstallPackages(Collection<String> list, int userId) {
         BlackBoxCore blackBoxCore = BlackBoxCore.get();
         for (String packageName : list) {
+            // Per user: the engine only removes the shared copy when no other user still has it.
             blackBoxCore.uninstallPackageAsUser(packageName, userId);
         }
     }
 
-    public static InstallResult installGApps(int userId) {
-        Set<String> googleApps = new HashSet<>();
+    /** Kills every process of every package installed in {@code userId}, so apps re-bind to whatever Google services exist afterwards. */
+    private static void stopAllInUser(int userId) {
+        BlackBoxCore blackBoxCore = BlackBoxCore.get();
+        try {
+            List<PackageInfo> packages = blackBoxCore.getInstalledPackages(0, userId);
+            if (packages == null) return;
+            for (PackageInfo info : packages) {
+                blackBoxCore.stopPackage(info.packageName, userId);
+            }
+        } catch (Throwable t) {
+            Slog.w(TAG, "stopAllInUser(" + userId + ") failed: " + t);
+        }
+    }
 
+    public static InstallResult installGApps(int userId) {
+        if (!isSupportGms()) {
+            return new InstallResult().installError(GMS_PKG, "This phone has no Google Play services");
+        }
+        Set<String> googleApps = new LinkedHashSet<>();
+        // Services first: the apps depend on them.
         googleApps.addAll(GOOGLE_SERVICE);
         googleApps.addAll(GOOGLE_APP);
 
-        InstallResult installResult = installPackages(googleApps, userId);
-        if (!installResult.success) {
-            uninstallGApps(userId);
-            return installResult;
+        stopAllInUser(userId);
+        List<String> installed = new ArrayList<>();
+        InstallResult installResult = installPackages(googleApps, userId, installed);
+        if (installResult.success && !isInstalledGoogleService(userId)) {
+            installResult = new InstallResult().installError(GMS_PKG, "Google Play services were not installed");
         }
+        if (!installResult.success) {
+            Slog.w(TAG, "installGApps(" + userId + ") failed, rolling back " + installed + ": " + installResult.msg);
+            // Roll back only what this call added; never packages the user already had.
+            uninstallPackages(installed, userId);
+        }
+        stopAllInUser(userId);
         return installResult;
     }
 
+    /**
+     * Removes the Google packages (and their data and the user's Google accounts, see
+     * {@code BAccountManagerService.onPackageUninstalled}) from {@code userId} only.
+     */
     public static void uninstallGApps(int userId) {
+        stopAllInUser(userId);
         uninstallPackages(GOOGLE_SERVICE, userId);
         uninstallPackages(GOOGLE_APP, userId);
+        stopAllInUser(userId);
     }
 
     public static void remove(String packageName) {
