@@ -7,6 +7,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -25,6 +26,7 @@ import dev.clonelab.app.keepalive.KeepAliveController
 import dev.clonelab.app.ui.AppVisuals
 import dev.clonelab.app.ui.detail.CloneDetailActivity
 import dev.clonelab.app.ui.home.CloneAdapter
+import dev.clonelab.app.ui.selection.SelectionActionMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,6 +37,7 @@ class CloneGroupActivity : AppCompatActivity() {
     private lateinit var binding: ActivityCloneGroupBinding
     private lateinit var adapter: CloneAdapter
     private lateinit var touchHelper: ItemTouchHelper
+    private lateinit var selectionBar: SelectionActionMode
     private val appPackage: String get() = intent.getStringExtra(EXTRA_PACKAGE).orEmpty()
     private val viewModel: CloneGroupViewModel by viewModels {
         viewModelFactory {
@@ -52,11 +55,17 @@ class CloneGroupActivity : AppCompatActivity() {
 
         adapter = CloneAdapter(
             onClick = ::onCloneClicked,
-            onLongClick = ::openDetail,
+            onLongClick = { viewModel.toggleSelected(it.record.id) },
             onSettings = ::openDetail,
             onAdd = viewModel::addClone,
             addCaption = R.string.home_add_clone,
             onDragStart = { touchHelper.startDrag(it) },
+        )
+        selectionBar = SelectionActionMode(
+            this,
+            onSelectAll = viewModel::selectAll,
+            onUninstall = ::confirmUninstall,
+            onClosed = viewModel::clearSelection,
         )
         adapter.reorderMode = savedInstanceState?.getBoolean(STATE_REORDER) == true
         binding.list.layoutManager = GridLayoutManager(this, COLUMNS)
@@ -76,7 +85,10 @@ class CloneGroupActivity : AppCompatActivity() {
                         adapter.submitList(state.items)
                         warmUpVisuals(state.items)
                         showTitle(state.items)
-                        binding.progress.visibility = if (state.adding) View.VISIBLE else View.INVISIBLE
+                        binding.progress.visibility =
+                            if (state.adding || state.removing) View.VISIBLE else View.INVISIBLE
+                        adapter.showSelection(state.selection.selected)
+                        selectionBar.render(state.selection.size, state.removing)
                     }
                 }
                 launch {
@@ -122,6 +134,8 @@ class CloneGroupActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId != R.id.action_reorder) return super.onOptionsItemSelected(item)
+        // Reorder and selection exclude each other.
+        if (viewModel.state.value.selection.isActive) return true
         adapter.reorderMode = !adapter.reorderMode
         invalidateOptionsMenu()
         return true
@@ -145,7 +159,7 @@ class CloneGroupActivity : AppCompatActivity() {
         }
     }
 
-    /** Drag is started from touch in reorder mode, never by long press (that opens the detail). */
+    /** Drag is started from touch in reorder mode, never by long press (that selects a clone). */
     private inner class DragCallback : ItemTouchHelper.SimpleCallback(
         ItemTouchHelper.UP or ItemTouchHelper.DOWN or ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,
         0,
@@ -179,7 +193,26 @@ class CloneGroupActivity : AppCompatActivity() {
         }
     }
 
+    private fun confirmUninstall() {
+        val count = viewModel.state.value.selection.size
+        if (count == 0) return
+        val message = if (count == 1) {
+            getString(R.string.selection_uninstall_one)
+        } else {
+            getString(R.string.selection_uninstall_many, count)
+        }
+        AlertDialog.Builder(this)
+            .setMessage(message)
+            .setPositiveButton(R.string.detail_uninstall) { _, _ -> viewModel.uninstallSelected() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
     private fun onCloneClicked(item: CloneItem) {
+        if (viewModel.state.value.selection.isActive) {
+            viewModel.toggleSelected(item.record.id)
+            return
+        }
         // A broken clone cannot be launched; its detail screen offers removal.
         if (item.installed) viewModel.launch(item.record.id) else openDetail(item)
     }

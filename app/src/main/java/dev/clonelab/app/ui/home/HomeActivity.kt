@@ -29,6 +29,7 @@ import dev.clonelab.app.keepalive.KeepAliveController
 import dev.clonelab.app.ui.AppVisuals
 import dev.clonelab.app.ui.add.AddCloneActivity
 import dev.clonelab.app.ui.group.CloneGroupActivity
+import dev.clonelab.app.ui.selection.SelectionActionMode
 import dev.clonelab.app.update.UpdateChecker
 import dev.clonelab.app.update.UpdateDownloader
 import dev.clonelab.app.update.UpdateFiles
@@ -47,6 +48,9 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var adapter: AppGroupAdapter
     private lateinit var setupFlow: SetupFlow
     private lateinit var updateUi: UpdateUi
+    private lateinit var selectionBar: SelectionActionMode
+    private var checkingUpdates = false
+    private var removingApps = false
     private val updateViewModel: UpdateViewModel by viewModels {
         viewModelFactory {
             initializer {
@@ -74,8 +78,15 @@ class HomeActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         adapter = AppGroupAdapter(
-            onAppClick = ::openGroup,
+            onAppClick = ::onAppClicked,
+            onAppLongClick = { viewModel.toggleSelected(it.packageName) },
             onAddClick = { startActivity(Intent(this, AddCloneActivity::class.java)) },
+        )
+        selectionBar = SelectionActionMode(
+            this,
+            onSelectAll = viewModel::selectAll,
+            onUninstall = ::confirmUninstall,
+            onClosed = viewModel::clearSelection,
         )
         binding.list.layoutManager = GridLayoutManager(this, COLUMNS)
         binding.list.adapter = adapter
@@ -100,6 +111,10 @@ class HomeActivity : AppCompatActivity() {
                 launch {
                     viewModel.state.collect { state ->
                         adapter.submitList(state.groups)
+                        adapter.showSelection(state.selection.selected)
+                        selectionBar.render(state.selection.size, state.removing)
+                        removingApps = state.removing
+                        renderProgress()
                         warmUpVisuals(state.groups)
                         binding.empty.visibility =
                             if (state.groups.isEmpty() && !state.engineFailed) View.VISIBLE else View.GONE
@@ -108,7 +123,10 @@ class HomeActivity : AppCompatActivity() {
                 }
                 launch { updateViewModel.banner.collect(::renderUpdateBanner) }
                 launch {
-                    updateViewModel.checking.collect { binding.updateProgress.visibility = if (it) View.VISIBLE else View.GONE }
+                    updateViewModel.checking.collect {
+                        checkingUpdates = it
+                        renderProgress()
+                    }
                 }
                 launch {
                     viewModel.messages.collect { Snackbar.make(binding.root, it.resolve(this@HomeActivity), Snackbar.LENGTH_LONG).show() }
@@ -127,6 +145,10 @@ class HomeActivity : AppCompatActivity() {
     override fun onDestroy() {
         updateUi.close()
         super.onDestroy()
+    }
+
+    private fun renderProgress() {
+        binding.updateProgress.visibility = if (checkingUpdates || removingApps) View.VISIBLE else View.GONE
     }
 
     private fun renderUpdateBanner(release: ReleaseInfo?) {
@@ -201,6 +223,27 @@ class HomeActivity : AppCompatActivity() {
             }
             if (changed) adapter.notifyItemRangeChanged(0, adapter.itemCount)
         }
+    }
+
+    private fun onAppClicked(group: AppGroup) {
+        if (viewModel.state.value.selection.isActive) viewModel.toggleSelected(group.packageName) else openGroup(group)
+    }
+
+    private fun confirmUninstall() {
+        val state = viewModel.state.value
+        val chosen = state.groups.filter { it.packageName in state.selection }
+        val clones = chosen.sumOf { it.cloneCount }
+        val message = when {
+            clones == 0 -> return
+            clones == 1 -> getString(R.string.selection_uninstall_one)
+            chosen.size == 1 -> getString(R.string.selection_uninstall_app, clones)
+            else -> getString(R.string.selection_uninstall_apps, clones, chosen.size)
+        }
+        AlertDialog.Builder(this)
+            .setMessage(message)
+            .setPositiveButton(R.string.detail_uninstall) { _, _ -> viewModel.uninstallSelected() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun openGroup(group: AppGroup) {

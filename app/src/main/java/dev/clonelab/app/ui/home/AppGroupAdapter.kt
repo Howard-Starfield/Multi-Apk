@@ -8,14 +8,24 @@ import androidx.recyclerview.widget.RecyclerView
 import dev.clonelab.app.R
 import dev.clonelab.app.databinding.ItemCloneBinding
 import dev.clonelab.app.ui.AppVisuals
+import dev.clonelab.app.ui.selection.showSelected
 
 /** Home grid: one tile per app, then the add tile as a second view type (never an item). */
 class AppGroupAdapter(
     private val onAppClick: (AppGroup) -> Unit,
+    private val onAppLongClick: (AppGroup) -> Unit,
     private val onAddClick: () -> Unit,
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private var groups: List<AppGroup> = emptyList()
+    private var selected: Set<String> = emptySet()
+
+    /** Selection mode while any app is selected: tiles toggle, the add tile is inert. */
+    fun showSelection(packages: Set<String>) {
+        if (packages == selected) return
+        selected = packages
+        notifyItemRangeChanged(0, itemCount)
+    }
 
     override fun getItemCount() = groups.size + 1
 
@@ -45,7 +55,7 @@ class AppGroupAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         if (holder is AddTileHolder) {
-            holder.bind(R.string.home_add_app, enabled = true, onClick = onAddClick)
+            holder.bind(R.string.home_add_app, enabled = selected.isEmpty(), onClick = onAddClick)
             return
         }
         val group = groups[position]
@@ -60,8 +70,8 @@ class AppGroupAdapter(
             root.alpha = 1f
             settingsButton.visibility = View.GONE
             root.setOnClickListener { onAppClick(group) }
-            root.setOnLongClickListener(null)
-            root.isLongClickable = false
+            root.setOnLongClickListener { onAppLongClick(group); true }
+            showSelected(group.packageName in selected)
         }
     }
 

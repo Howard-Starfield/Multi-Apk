@@ -268,4 +268,14 @@
     <string name="update_permission_open">Open settings</string>
 
     <string name="clone_settings">Clone settings</string>
+
+    <string name="selection_count">%1$d selected</string>
+    <string name="selection_select_all">Select all</string>
+    <string name="selection_uninstall_one">Uninstall 1 clone and delete its data? This can\'t be undone.</string>
+    <string name="selection_uninstall_many">Uninstall %1$d clones and delete their data? This can\'t be undone.</string>
+    <string name="selection_uninstall_app">Uninstall all %1$d clones of this app and delete their data? This can\'t be undone.</string>
+    <string name="selection_uninstall_apps">Uninstall all %1$d clones of %2$d apps and delete their data? This can\'t be undone.</string>
+    <string name="selection_uninstalled_one">Uninstalled 1 clone</string>
+    <string name="selection_uninstalled_many">Uninstalled %1$d clones</string>
+    <string name="selection_uninstalled_partial">Uninstalled %1$d, %2$d could not be removed</string>
 </resources>

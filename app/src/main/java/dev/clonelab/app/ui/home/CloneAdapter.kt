@@ -15,6 +15,7 @@ import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.databinding.ItemCloneBinding
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.ui.AppVisuals
+import dev.clonelab.app.ui.selection.showSelected
 
 class CloneAdapter(
     private val onClick: (CloneItem) -> Unit,
@@ -31,6 +32,17 @@ class CloneAdapter(
             field = value
             notifyItemRangeChanged(0, itemCount)
         }
+
+    private var selectionMode = false
+    private var selected: Set<CloneId> = emptySet()
+
+    /** Selection mode while anything is selected: tiles toggle instead of launching, no settings buttons. */
+    fun showSelection(ids: Set<CloneId>) {
+        if (ids == selected) return
+        selected = ids
+        selectionMode = ids.isNotEmpty()
+        notifyItemRangeChanged(0, itemCount)
+    }
 
     /** The list as the user currently sees it, including moves not yet persisted. */
     private var working: List<CloneItem> = emptyList()
@@ -97,7 +109,7 @@ class CloneAdapter(
     @SuppressLint("ClickableViewAccessibility")
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         if (holder is AddTileHolder) {
-            holder.bind(addCaption, enabled = !reorderMode, onClick = onAdd)
+            holder.bind(addCaption, enabled = !reorderMode && !selectionMode, onClick = onAdd)
             return
         }
         holder as Holder
@@ -112,8 +124,9 @@ class CloneAdapter(
             }
             root.alpha = if (item.installed) 1f else 0.5f
             runningDot.visibility = if (item.running) View.VISIBLE else View.GONE
-            // Not while reordering; works for broken clones too (it is how their details are reached from the corner).
-            settingsButton.visibility = if (reorderMode) View.GONE else View.VISIBLE
+            // Not while reordering or selecting; works for broken clones too (it is how their details are reached from the corner).
+            settingsButton.visibility = if (reorderMode || selectionMode) View.GONE else View.VISIBLE
+            showSelected(item.record.id in selected)
             settingsButton.setOnClickListener { onSettings(item) }
             holder.updateSettingsTouchTarget()
             if (reorderMode) {

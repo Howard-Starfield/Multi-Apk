@@ -265,4 +265,14 @@
     <string name="update_permission_open">打开设置</string>
 
     <string name="clone_settings">分身设置</string>
+
+    <string name="selection_count">已选择 %1$d 项</string>
+    <string name="selection_select_all">全选</string>
+    <string name="selection_uninstall_one">确定卸载 1 个分身并删除其数据吗？此操作无法撤销。</string>
+    <string name="selection_uninstall_many">确定卸载 %1$d 个分身并删除它们的数据吗？此操作无法撤销。</string>
+    <string name="selection_uninstall_app">确定卸载此应用的全部 %1$d 个分身并删除它们的数据吗？此操作无法撤销。</string>
+    <string name="selection_uninstall_apps">确定卸载 %2$d 个应用的全部 %1$d 个分身并删除它们的数据吗？此操作无法撤销。</string>
+    <string name="selection_uninstalled_one">已卸载 1 个分身</string>
+    <string name="selection_uninstalled_many">已卸载 %1$d 个分身</string>
+    <string name="selection_uninstalled_partial">已卸载 %1$d 个，%2$d 个无法移除</string>
 </resources>

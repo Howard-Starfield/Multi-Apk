@@ -9,6 +9,9 @@ import dev.clonelab.app.data.CloneRepository
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.ui.UserMessage
 import dev.clonelab.app.ui.launchGuarded
+import dev.clonelab.app.ui.selection.Selection
+import dev.clonelab.app.ui.selection.SelectionState
+import dev.clonelab.app.ui.selection.toMessage
 import dev.clonelab.app.ui.toUserMessage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -19,6 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** [loaded] is false until the first refresh finished: an empty list before that is not "all clones removed". */
@@ -26,6 +30,9 @@ data class GroupState(
     val items: List<CloneItem> = emptyList(),
     val loaded: Boolean = false,
     val adding: Boolean = false,
+    val selection: Selection<CloneId> = Selection(),
+    /** True while selected clones are being uninstalled. */
+    val removing: Boolean = false,
 )
 
 class CloneGroupViewModel(
@@ -37,15 +44,24 @@ class CloneGroupViewModel(
     private val loaded = MutableStateFlow(false)
     private val adding = MutableStateFlow(false)
     private val errors = Channel<UserMessage>(Channel.BUFFERED)
+    private val selecting = SelectionState<CloneId>()
 
-    val state: StateFlow<GroupState> = combine(repository.clones, loaded, adding) { all, isLoaded, busy ->
-        GroupState(all.filter { it.record.id.packageName == packageName }, isLoaded, busy)
+    val state: StateFlow<GroupState> = combine(
+        repository.clones, loaded, adding, selecting.selection, selecting.removing,
+    ) { all, isLoaded, busy, selection, removing ->
+        GroupState(all.filter { it.record.id.packageName == packageName }, isLoaded, busy, selection, removing)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, GroupState())
 
     /** One-shot error messages for the UI to show. */
     val messages: Flow<UserMessage> = errors.receiveAsFlow()
 
     init {
+        // Clones that disappear (removed elsewhere) leave the selection.
+        viewModelScope.launch {
+            repository.clones.collect { all ->
+                selecting.retainOnly(all.map { it.record.id }.filter { it.packageName == packageName })
+            }
+        }
         launchGuarded(::report) {
             try {
                 repository.refreshWhenReady()
@@ -57,6 +73,24 @@ class CloneGroupViewModel(
 
     fun refresh() {
         if (loaded.value) launchGuarded(::report) { repository.refresh() }
+    }
+
+    fun toggleSelected(id: CloneId) = selecting.toggle(id)
+
+    fun selectAll() = selecting.selectAll(state.value.items.map { it.record.id })
+
+    fun clearSelection() = selecting.clear()
+
+    /** Uninstalls the selected clones one by one, carrying on after failures, and reports the outcome. */
+    fun uninstallSelected() {
+        launchGuarded(::report) {
+            val result = selecting.removeSelected(
+                cloneIds = { listOf(it) },
+                keyOf = { it },
+                remove = { repository.remove(it).isSuccess },
+            )
+            result?.toMessage()?.let { errors.send(it) }
+        }
     }
 
     fun launch(id: CloneId) {
