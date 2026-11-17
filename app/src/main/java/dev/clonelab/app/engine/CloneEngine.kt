@@ -40,6 +40,18 @@ interface CloneEngine {
     fun applyLocation(id: CloneId, location: LocationConfig?)
     fun applyDeviceProfile(id: CloneId, profile: DeviceProfile?)
 
+    /** Whether the phone has Google Play services a clone user can get its own copy of. */
+    fun googleServicesSupported(): Boolean
+
+    /** Whether virtual user [userId] has its own copy of the Google services. */
+    fun hasGoogleServices(userId: Int): Boolean
+
+    /** Gives [userId] its own Google services; on failure the user is left without any. */
+    fun installGoogleServices(userId: Int): EngineResult
+
+    /** Takes [userId]'s own Google services and their data away; other users are untouched. */
+    fun removeGoogleServices(userId: Int): EngineResult
+
     /** Path of the APK the engine installed for this clone, or null when unknown. */
     fun apkPath(id: CloneId): String?
 }

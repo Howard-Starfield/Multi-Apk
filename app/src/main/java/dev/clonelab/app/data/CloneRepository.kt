@@ -20,6 +20,9 @@ class EngineUnavailableException : CloneException(CloneError.EngineNotRunning)
 
 data class CloneItem(val record: CloneRecord, val installed: Boolean, val running: Boolean)
 
+/** Whether the phone can give a clone number its own Google services, and whether this one has them. */
+data class GoogleServicesStatus(val supported: Boolean, val enabled: Boolean)
+
 /** Joins stored settings with live engine state. All engine work happens on [Dispatchers.IO]. */
 class CloneRepository(
     private val engine: CloneEngine,
@@ -155,6 +158,49 @@ class CloneRepository(
                 record?.iconImagePath?.let { File(it).delete() }
                 _clones.value = loadItems()
                 Result.success(Unit)
+            }
+        }
+    }
+
+    /** Null when the engine cannot be asked right now. */
+    suspend fun googleServicesStatus(userId: Int): GoogleServicesStatus? = withContext(Dispatchers.IO) {
+        if (!engine.isAvailable()) return@withContext null
+        val status = GoogleServicesStatus(engine.googleServicesSupported(), engine.hasGoogleServices(userId))
+        if (engine.isAvailable()) status else null
+    }
+
+    /**
+     * Gives clone number [userId] (every app that uses it) its own Google services, or takes them away.
+     * Running clones of that number are stopped first, like a manual Stop: the marks stay until the user
+     * opens them again (launch clears it), so keep-alive does not relaunch them over the user's screen.
+     * Clones of other numbers are not touched. On failure the user is left without Google services
+     * when enabling, and the engine's state is whatever it reports when disabling.
+     */
+    suspend fun setGoogleServices(userId: Int, enabled: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            attempt {
+                requireEngine()
+                if (!engine.googleServicesSupported()) {
+                    return@attempt Result.failure(CloneException(CloneError.NoGoogleServices))
+                }
+                store.all().map { it.id }.filter { it.userId == userId && engine.isRunning(it) }.forEach {
+                    ManualStops.add(it)
+                    engine.stop(it)
+                }
+                val result = if (enabled) engine.installGoogleServices(userId) else engine.removeGoogleServices(userId)
+                requireEngine()
+                _clones.value = loadItems()
+                when {
+                    result is EngineResult.Error -> {
+                        // Enabling must not leave half a set behind.
+                        if (enabled && engine.hasGoogleServices(userId)) engine.removeGoogleServices(userId)
+                        Result.failure(CloneException(result.error))
+                    }
+                    engine.hasGoogleServices(userId) != enabled -> Result.failure(
+                        CloneException(if (enabled) CloneError.InstallFailed(null) else CloneError.GoogleServicesRemoveFailed),
+                    )
+                    else -> Result.success(Unit)
+                }
             }
         }
     }

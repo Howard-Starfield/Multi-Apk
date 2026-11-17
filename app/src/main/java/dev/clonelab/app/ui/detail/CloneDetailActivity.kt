@@ -83,6 +83,7 @@ class CloneDetailActivity : AppCompatActivity() {
         binding.keepAliveGuide.setOnClickListener { startActivity(KeepAliveGuideActivity.intent(this)) }
         binding.location.setOnClickListener { startActivity(LocationActivity.intent(this, viewModel.cloneId)) }
         binding.deviceProfile.setOnClickListener { startActivity(DeviceProfileActivity.intent(this, viewModel.cloneId)) }
+        binding.googleSwitch.setOnClickListener { onGoogleSwitchClicked() }
         binding.stop.setOnClickListener { viewModel.stop() }
         binding.clearData.setOnClickListener { confirm(R.string.detail_clear_data_confirm, viewModel::clearData) }
         binding.uninstall.setOnClickListener { confirm(R.string.detail_uninstall_confirm, viewModel::remove) }
@@ -96,6 +97,7 @@ class CloneDetailActivity : AppCompatActivity() {
                         if (item != null) warmUpVisuals(item)
                     }
                 }
+                launch { viewModel.google.collect { renderGoogle(it) } }
                 launch {
                     viewModel.messages.collect { event ->
                         when (event) {
@@ -142,6 +144,39 @@ class CloneDetailActivity : AppCompatActivity() {
         binding.keepAlive.isChecked = record.keepAlive
         binding.actions.visibility = if (item.installed) View.VISIBLE else View.GONE
         binding.remove.visibility = if (item.installed) View.GONE else View.VISIBLE
+    }
+
+    /** The switch is only a display of the engine's state: a tap asks for confirmation and the state decides. */
+    private fun onGoogleSwitchClicked() {
+        val enable = binding.googleSwitch.isChecked
+        renderGoogle(viewModel.google.value) // undo the visual toggle until confirmed
+        val number = viewModel.cloneId.userId + 1
+        AlertDialog.Builder(this)
+            .setMessage(getString(if (enable) R.string.google_enable_confirm else R.string.google_disable_confirm, number))
+            .setPositiveButton(R.string.confirm) { _, _ -> viewModel.setGoogleServices(enable) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun renderGoogle(ui: GoogleUi) {
+        val number = viewModel.cloneId.userId + 1
+        val status = ui.status
+        binding.googleSwitch.text = getString(R.string.detail_google_switch, number)
+        binding.googleSwitch.isChecked = status?.enabled == true
+        binding.googleSwitch.isEnabled = status != null && status.supported && !ui.busy
+        binding.googleProgress.visibility = if (ui.busy) View.VISIBLE else View.GONE
+        binding.googleStatus.text = when {
+            ui.busy -> getString(R.string.google_status_working)
+            status == null -> ""
+            !status.supported -> getString(R.string.google_unsupported)
+            status.enabled -> getString(R.string.google_status_on, number)
+            else -> getString(R.string.google_status_off, number)
+        }
+        val others = ui.sharedWith
+        binding.googleShared.visibility = if (others.isEmpty()) View.GONE else View.VISIBLE
+        if (others.isNotEmpty()) {
+            binding.googleShared.text = getString(R.string.google_shared, others.joinToString(", ") { AppVisuals.label(it) })
+        }
     }
 
     /** Loads APK-derived label and icon off the main thread, then redraws if anything changed. */

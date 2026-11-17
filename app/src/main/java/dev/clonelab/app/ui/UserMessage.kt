@@ -17,6 +17,8 @@ fun CloneError.toUserMessage(): UserMessage = when (this) {
     CloneError.UninstallFailed -> UserMessage(R.string.error_uninstall_failed)
     CloneError.NoPackageName -> UserMessage(R.string.error_no_package_name)
     CloneError.NoResult -> UserMessage(R.string.error_engine_no_result)
+    CloneError.NoGoogleServices -> UserMessage(R.string.google_unsupported)
+    CloneError.GoogleServicesRemoveFailed -> UserMessage(R.string.error_google_remove_failed)
     is CloneError.SaveFailed ->
         if (detail.isNullOrBlank()) UserMessage(R.string.error_save_failed)
         else UserMessage(R.string.error_save_failed_detail, listOf(detail))

@@ -54,6 +54,17 @@
 
     <string name="detail_location">Location</string>
     <string name="detail_device_profile">Device profile</string>
+    <string name="detail_google_title">Google services</string>
+    <string name="detail_google_switch">Separate Google services for clone %1$d</string>
+    <string name="google_unsupported">This phone has no Google Play services.</string>
+    <string name="google_status_on">Clone %1$d has its own Google services.</string>
+    <string name="google_status_off">Clone %1$d uses the phone\'s own Google account.</string>
+    <string name="google_status_working">Working, this can take a minute…</string>
+    <string name="google_shared">Also applies to: %1$s</string>
+    <string name="google_enable_confirm">Clone %1$d gets its own copy of Google Play services, so apps in clone %1$d can sign in with a different Google account. All apps in clone %1$d share it. This is experimental: some apps may refuse to sign in, and it uses more memory and battery. Apps in clone %1$d will be closed.</string>
+    <string name="google_disable_confirm">Apps in clone %1$d will go back to the phone\'s own Google account. Google data stored in clone %1$d is deleted.</string>
+    <string name="error_google_failed">Could not change the Google services.</string>
+    <string name="error_google_remove_failed">Could not remove the Google services.</string>
     <string name="stop_now">Stop clone now</string>
 
     <string name="location_title">Location</string>

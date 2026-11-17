@@ -115,6 +115,24 @@ class BlackBoxCloneEngine : CloneEngine {
             ?.takeIf { it.isNotBlank() }
     }
 
+    override fun googleServicesSupported(): Boolean = safe(false) { core.isSupportGms() }
+
+    override fun hasGoogleServices(userId: Int): Boolean = safe(false) { core.isInstallGms(userId) }
+
+    // Not toResult(): the Google packages are many, so a successful InstallResult carries no package name.
+    override fun installGoogleServices(userId: Int): EngineResult = guarded {
+        val result = core.installGms(userId)
+        when {
+            result == null -> EngineResult.Error(CloneError.NoResult)
+            !result.success -> EngineResult.Error(CloneError.InstallFailed(result.msg))
+            else -> EngineResult.Ok
+        }
+    }
+
+    override fun removeGoogleServices(userId: Int): EngineResult = guarded {
+        if (core.uninstallGms(userId)) EngineResult.Ok else EngineResult.Error(CloneError.GoogleServicesRemoveFailed)
+    }
+
     /** "<userId>:<packageName>" -> id; anything malformed is null. */
     private fun parseFocused(raw: String?): CloneId? {
         if (raw.isNullOrBlank()) return null

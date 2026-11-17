@@ -54,6 +54,17 @@
 
     <string name="detail_location">虚拟定位</string>
     <string name="detail_device_profile">设备信息</string>
+    <string name="detail_google_title">Google 服务</string>
+    <string name="detail_google_switch">为分身 %1$d 使用独立的 Google 服务</string>
+    <string name="google_unsupported">这部手机没有 Google Play 服务。</string>
+    <string name="google_status_on">分身 %1$d 使用自己的 Google 服务。</string>
+    <string name="google_status_off">分身 %1$d 使用手机自己的 Google 账号。</string>
+    <string name="google_status_working">处理中，可能需要一分钟…</string>
+    <string name="google_shared">同样适用于：%1$s</string>
+    <string name="google_enable_confirm">分身 %1$d 会获得独立的 Google Play 服务，因此分身 %1$d 中的应用可以使用不同的 Google 账号登录。分身 %1$d 中的所有应用共用这一份。此功能处于实验阶段：部分应用可能拒绝登录，并且会占用更多内存和电量。分身 %1$d 中的应用将被关闭。</string>
+    <string name="google_disable_confirm">分身 %1$d 中的应用将恢复使用手机自己的 Google 账号。分身 %1$d 中保存的 Google 数据将被删除。</string>
+    <string name="error_google_failed">无法更改 Google 服务。</string>
+    <string name="error_google_remove_failed">无法移除 Google 服务。</string>
     <string name="stop_now">立即停止分身</string>
 
     <string name="location_title">虚拟定位</string>

@@ -374,4 +374,143 @@ class CloneRepositoryTest {
         val record = repository.addFromApk("content://apk", "x").getOrThrow()
         assertEquals(1, record.id.userId)
     }
+
+    // --- Google services per clone number (user id) ---
+
+    /** com.a#0 and com.b#0 share clone number 1; com.a#1 is clone number 2. */
+    private suspend fun threeClones(): Triple<CloneId, CloneId, CloneId> {
+        val a0 = repository.addFromInstalledApp("com.a", "A").getOrThrow().id
+        val b0 = repository.addFromInstalledApp("com.b", "B").getOrThrow().id
+        val a1 = repository.addFromInstalledApp("com.a", "A").getOrThrow().id
+        assertEquals(listOf(0, 0, 1), listOf(a0, b0, a1).map { it.userId })
+        return Triple(a0, b0, a1)
+    }
+
+    @Test
+    fun googleServicesFailOnAPhoneWithoutPlayServices() = runTest {
+        ManualStops.clearAll()
+        setUp()
+        val (a0, _, _) = threeClones()
+        engine.running += a0
+        engine.googleSupported = false
+
+        val result = repository.setGoogleServices(0, true)
+
+        assertEquals(CloneError.NoGoogleServices, (result.exceptionOrNull() as CloneException).error)
+        assertTrue(a0 in engine.running)
+        assertTrue(engine.stopped.isEmpty())
+        assertFalse(engine.calls.any { it.startsWith("installGoogle") })
+    }
+
+    @Test
+    fun googleServicesFailWhenTheEngineIsDown() = runTest {
+        setUp()
+        threeClones()
+        engine.available = false
+
+        val result = repository.setGoogleServices(0, true)
+
+        assertEquals(CloneError.EngineNotRunning, (result.exceptionOrNull() as CloneException).error)
+        assertTrue(engine.googleUsers.isEmpty())
+        assertEquals(null, repository.googleServicesStatus(0))
+    }
+
+    @Test
+    fun enablingGoogleServicesStopsRunningClonesOfThatNumberOnly() = runTest {
+        ManualStops.clearAll()
+        setUp()
+        val (a0, b0, a1) = threeClones()
+        engine.running += listOf(a0, b0, a1)
+
+        assertTrue(repository.setGoogleServices(0, true).isSuccess)
+
+        assertEquals(setOf(0), engine.googleUsers)
+        assertEquals(setOf(a0, b0), engine.stopped.toSet())
+        assertEquals(setOf(a1), engine.running)
+        assertEquals(GoogleServicesStatus(supported = true, enabled = true), repository.googleServicesStatus(0))
+        assertEquals(GoogleServicesStatus(supported = true, enabled = false), repository.googleServicesStatus(1))
+        // Stopped before the change, never reinstalled by hand: the watchdog must leave them alone ...
+        assertTrue(ManualStops.contains(a0))
+        assertTrue(ManualStops.contains(b0))
+        assertFalse(ManualStops.contains(a1))
+        // ... until the user opens one again.
+        repository.launch(a0)
+        assertFalse(ManualStops.contains(a0))
+        assertTrue(ManualStops.contains(b0))
+        ManualStops.clearAll()
+    }
+
+    @Test
+    fun stopHappensBeforeTheEngineChange() = runTest {
+        ManualStops.clearAll()
+        setUp()
+        val (a0, _, _) = threeClones()
+        engine.running += a0
+        var stoppedBeforeInstall = false
+        val spy = object : dev.clonelab.app.engine.CloneEngine by engine {
+            override fun installGoogleServices(userId: Int): dev.clonelab.app.engine.EngineResult {
+                stoppedBeforeInstall = a0 in engine.stopped && ManualStops.contains(a0)
+                return engine.installGoogleServices(userId)
+            }
+        }
+        val spied = CloneRepository(spy, store) { 42L }
+
+        assertTrue(spied.setGoogleServices(0, true).isSuccess)
+
+        assertTrue(stoppedBeforeInstall)
+        ManualStops.clearAll()
+    }
+
+    @Test
+    fun disablingGoogleServicesRemovesThemForThatNumberOnly() = runTest {
+        ManualStops.clearAll()
+        setUp()
+        val (a0, _, a1) = threeClones()
+        engine.googleUsers += setOf(0, 1)
+        engine.running += listOf(a0, a1)
+
+        assertTrue(repository.setGoogleServices(0, false).isSuccess)
+
+        assertEquals(setOf(1), engine.googleUsers)
+        assertEquals(listOf(a0), engine.stopped)
+        assertTrue(a1 in engine.running)
+        ManualStops.clearAll()
+    }
+
+    @Test
+    fun installFailureLeavesGoogleServicesOffAndReportsTheReason() = runTest {
+        ManualStops.clearAll()
+        setUp()
+        threeClones()
+        engine.googleInstallError = "no space"
+
+        val error = (repository.setGoogleServices(0, true).exceptionOrNull() as CloneException).error
+
+        assertEquals(CloneError.InstallFailed("no space"), error)
+        assertTrue(engine.googleUsers.isEmpty())
+        assertFalse(repository.googleServicesStatus(0)!!.enabled)
+        ManualStops.clearAll()
+    }
+
+    @Test
+    fun removalThatDoesNotTakeEffectIsAFailureAndStaysOn() = runTest {
+        ManualStops.clearAll()
+        setUp()
+        threeClones()
+        engine.googleUsers += 0
+        engine.googleRemoveStuck = true
+
+        val error = (repository.setGoogleServices(0, false).exceptionOrNull() as CloneException).error
+
+        assertEquals(CloneError.GoogleServicesRemoveFailed, error)
+        assertTrue(repository.googleServicesStatus(0)!!.enabled)
+        ManualStops.clearAll()
+    }
+
+    @Test
+    fun googleServicesStatusReportsAnUnsupportedPhone() = runTest {
+        setUp()
+        engine.googleSupported = false
+        assertEquals(GoogleServicesStatus(supported = false, enabled = false), repository.googleServicesStatus(0))
+    }
 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.clonelab.app.data.CloneItem
 import dev.clonelab.app.data.CloneRepository
+import dev.clonelab.app.data.GoogleServicesStatus
 import android.net.Uri
 import dev.clonelab.app.model.CloneId
 import dev.clonelab.app.model.CloneRecord
@@ -13,6 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -33,6 +36,16 @@ sealed interface DetailEvent {
     data object PinFailed : DetailEvent
 }
 
+/**
+ * The "Google services" section. [status] is null while unknown (engine unreachable); [sharedWith] are the
+ * other clones that use the same clone number and so share the setting.
+ */
+data class GoogleUi(
+    val status: GoogleServicesStatus? = null,
+    val busy: Boolean = false,
+    val sharedWith: List<CloneRecord> = emptyList(),
+)
+
 class CloneDetailViewModel(
     private val id: CloneId,
     private val repository: CloneRepository,
@@ -49,11 +62,39 @@ class CloneDetailViewModel(
         .map { items -> items.firstOrNull { it.record.id == id } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    private val googleStatus = MutableStateFlow<GoogleServicesStatus?>(null)
+    private val googleBusy = MutableStateFlow(false)
+    val google: StateFlow<GoogleUi> = combine(googleStatus, googleBusy, repository.clones) { status, busy, items ->
+        GoogleUi(
+            status,
+            busy,
+            items.map { it.record }.filter { it.id.userId == id.userId && it.id != id },
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, GoogleUi())
+
     private val events = Channel<DetailEvent>(Channel.BUFFERED)
     val messages: Flow<DetailEvent> = events.receiveAsFlow()
 
     fun refresh() {
-        guarded { repository.refreshWhenReady() }
+        guarded {
+            repository.refreshWhenReady()
+            if (!googleBusy.value) googleStatus.value = repository.googleServicesStatus(id.userId)
+        }
+    }
+
+    /** Gives every clone with this clone's number its own Google services, or takes them away. */
+    fun setGoogleServices(enabled: Boolean) {
+        if (googleBusy.value) return
+        googleBusy.value = true
+        guarded {
+            try {
+                repository.setGoogleServices(id.userId, enabled)
+                    .onFailure { events.send(DetailEvent.Error(it.toUserMessage(R.string.error_google_failed))) }
+                googleStatus.value = repository.googleServicesStatus(id.userId)
+            } finally {
+                googleBusy.value = false
+            }
+        }
     }
 
     fun launch() {

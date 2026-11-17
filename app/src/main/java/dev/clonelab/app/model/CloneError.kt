@@ -11,6 +11,12 @@ sealed interface CloneError {
     data object NoPackageName : CloneError
     data object NoResult : CloneError
 
+    /** The phone has no Google Play services, so a clone cannot get its own copy. */
+    data object NoGoogleServices : CloneError
+
+    /** The engine could not take a user's Google services away again. */
+    data object GoogleServicesRemoveFailed : CloneError
+
     /** The clone was installed but its record could not be stored; [detail] is the I/O message, if any. */
     data class SaveFailed(val detail: String?) : CloneError
 

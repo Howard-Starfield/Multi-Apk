@@ -62,6 +62,7 @@ class FakeCloneEngine : CloneEngine {
     }
 
     override fun stop(id: CloneId) {
+        stopped += id
         running -= id
     }
 
@@ -82,6 +83,32 @@ class FakeCloneEngine : CloneEngine {
 
     override fun applyDeviceProfile(id: CloneId, profile: DeviceProfile?) {
         calls += "applyDeviceProfile:${profile?.presetName}"
+    }
+
+    /** Google services: a phone without them, users that have them, and a failing install/remove. */
+    var googleSupported = true
+    val googleUsers = mutableSetOf<Int>()
+    var googleInstallError: String? = null
+    var googleRemoveStuck = false
+
+    /** Every stop() in order, and which user ids were stopped. */
+    val stopped = mutableListOf<CloneId>()
+
+    override fun googleServicesSupported() = googleSupported
+    override fun hasGoogleServices(userId: Int) = available && userId in googleUsers
+
+    override fun installGoogleServices(userId: Int): EngineResult {
+        calls += "installGoogle:$userId"
+        googleInstallError?.let { return EngineResult.Error(CloneError.InstallFailed(it)) }
+        googleUsers += userId
+        return EngineResult.Ok
+    }
+
+    override fun removeGoogleServices(userId: Int): EngineResult {
+        calls += "removeGoogle:$userId"
+        if (googleRemoveStuck) return EngineResult.Error(CloneError.GoogleServicesRemoveFailed)
+        googleUsers -= userId
+        return EngineResult.Ok
     }
 
     val apkPaths = mutableMapOf<CloneId, String>()
