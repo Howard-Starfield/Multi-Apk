@@ -1,7 +1,7 @@
 # Reference material used only for feature analysis — never committed
 *.apk
 apk_extracted/
-tools/
+/tools/
 upstream/
 
 # Build output
