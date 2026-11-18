@@ -18,6 +18,8 @@ is required by the engine.
 - Phones: Android 5 or later, ARM (64- or 32-bit).
 - It is a debug-signed build, not a store release. A later build installs over
   it only if it is signed with the same key.
+- 0.1.2 is signed with a new key (the earlier key was lost). Coming from 0.1.0
+  or 0.1.1, uninstall CloneLab first; this deletes all clones and their data.
 - On Android 15, "Display over other apps" is greyed out for apps installed
   from a file until you allow it once: Settings, Apps, CloneLab, the menu in
   the top-right corner, "Allow restricted settings". The app walks you through it.
