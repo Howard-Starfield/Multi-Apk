@@ -117,7 +117,7 @@
     <string name="guide_battery_title">忽略电池优化</string>
     <string name="guide_battery_text">防止系统在后台暂停 CloneLab。</string>
     <string name="guide_overlay_title">悬浮窗权限（显示在其他应用上层）</string>
-    <string name="guide_overlay_text">用于自动重启分身。未开启时，你会收到一条通知，点按即可重启。</string>
+    <string name="guide_overlay_text">用于悬浮分身切换器和宏。分身停止后不会自动重新打开，你会收到一条通知，点按即可重启。</string>
     <string name="guide_autostart_title">自启动</string>
     <string name="guide_autostart_text">部分手机（小米、华为、OPPO、vivo、三星）需要允许 CloneLab 自启动并在后台运行。</string>
     <string name="home_setup_banner_permissions">在 CloneLab 获得权限之前，分身无法使用相册、相机和麦克风。</string>

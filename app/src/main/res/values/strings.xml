@@ -118,7 +118,7 @@
     <string name="guide_battery_title">Ignore battery optimisation</string>
     <string name="guide_battery_text">Stops the system from pausing CloneLab in the background.</string>
     <string name="guide_overlay_title">Display over other apps</string>
-    <string name="guide_overlay_text">Needed to restart clones automatically. Without it you get a notification to tap instead.</string>
+    <string name="guide_overlay_text">Needed for the floating clone switcher and macros. A clone that stops is never reopened on its own; you get a notification to tap instead.</string>
     <string name="guide_autostart_title">Auto-start</string>
     <string name="guide_autostart_text">On some phones (Xiaomi, Huawei, Oppo, Vivo, Samsung) allow CloneLab to auto-start and run in the background.</string>
     <string name="home_setup_banner_permissions">Clones can\'t use photos, camera or microphone until CloneLab is allowed to.</string>

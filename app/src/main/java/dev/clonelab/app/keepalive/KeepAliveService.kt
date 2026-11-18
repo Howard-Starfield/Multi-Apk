@@ -11,7 +11,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
-import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.ViewConfiguration
@@ -65,7 +64,7 @@ class KeepAliveService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var watchdog: Job? = null
 
-    /** One watchdog pass at a time: its maps are plain HashMaps and a clone must not be restarted twice. */
+    /** One watchdog pass at a time: its sets are plain HashSets and a stop must be reported once. */
     private val tickMutex = Mutex()
     private var switcherJob: Job? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -89,7 +88,6 @@ class KeepAliveService : Service() {
     /** Id of the latest start command; stopSelf(id) is ignored by Android if a newer start arrived. */
     @Volatile
     private var latestStartId = 0
-    private val lastRestartAt = mutableMapOf<CloneId, Long>()
     private val alerted = mutableSetOf<CloneId>()
     private val seenRunning = mutableSetOf<CloneId>()
 
@@ -250,8 +248,6 @@ class KeepAliveService : Service() {
         if (records.isEmpty()) return@withContext true // only the switcher needs the service
         val engine = ServiceLocator.engine()
         if (!engine.awaitReady(READY_TIMEOUT_MS)) return@withContext true
-        val repository = ServiceLocator.repository(applicationContext)
-        val canDraw = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this@KeepAliveService)
         var runningCount = 0
         for (record in records) {
             val id = record.id
@@ -263,24 +259,14 @@ class KeepAliveService : Service() {
                 notifications.cancelStopped(record)
                 continue
             }
-            val now = SystemClock.elapsedRealtime()
             val manuallyStopped = ManualStops.contains(id)
             if (manuallyStopped) {
                 alerted.remove(id)
                 notifications.cancelStopped(record)
             }
-            val action = WatchdogPolicy.decide(
-                now, lastRestartAt[id], running = false, canDrawOverlays = canDraw, manuallyStopped = manuallyStopped,
-                seenRunning = id in seenRunning,
-            )
-            when (action) {
-                WatchdogAction.None -> Unit
-                WatchdogAction.Restart -> {
-                    lastRestartAt[id] = now
-                    repository.launch(id).onFailure { Log.w(TAG, "Restart of $id failed: ${it.message}") }
-                }
-                WatchdogAction.Notify -> if (alerted.add(id)) notifications.stopped(record)
-            }
+            val action = WatchdogPolicy.decide(running = false, manuallyStopped = manuallyStopped, seenRunning = id in seenRunning)
+            // Never relaunched from here: see WatchdogPolicy. The alert is posted once per stop.
+            if (action == WatchdogAction.Notify && alerted.add(id)) notifications.stopped(record)
         }
         notifications.updateService(runningCount)
         true
