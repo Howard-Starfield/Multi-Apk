@@ -26,6 +26,9 @@ static std::shared_ptr<const SpoofTable> get_spoof_table() {
     return g_spoof_table;
 }
 
+static void install_property_get_hook();
+static std::once_flag g_hook_once;
+
 void set_spoof_props(JNIEnv *env, jclass clazz, jobjectArray keys, jobjectArray values) {
     auto table = std::make_shared<SpoofTable>();
     if (keys != nullptr && values != nullptr) {
@@ -47,8 +50,16 @@ void set_spoof_props(JNIEnv *env, jclass clazz, jobjectArray keys, jobjectArray 
             if (v != nullptr) env->DeleteLocalRef(v);
         }
     }
-    std::lock_guard<std::mutex> lock(g_spoof_mutex);
-    g_spoof_table = table;
+    {
+        std::lock_guard<std::mutex> lock(g_spoof_mutex);
+        g_spoof_table = table;
+    }
+    // The libc hook is installed only once a clone actually overrides a property. Patching libc
+    // unconditionally made app packers that check libc integrity (360 Jiagu) refuse to unpack and
+    // exit, leaving those clones on a black screen.
+    if (!table->empty()) {
+        std::call_once(g_hook_once, install_property_get_hook);
+    }
 }
 
 static int (*orig_system_property_get)(const char *name, char *value) = nullptr;
@@ -75,7 +86,7 @@ int my_system_property_get(const char *name, char *value) {
     return 0;
 }
 
-void install_property_get_hook() {
+static void install_property_get_hook() {
     void* handle = xdl_open("libc.so", XDL_DEFAULT);
     void* target = xdl_dsym(handle, "__system_property_get", nullptr);
     if (target) {
@@ -91,9 +102,3 @@ void install_property_get_hook() {
 
 }
 
-
-__attribute__((constructor)) void init_virtual_spoof()
-{
-    install_property_get_hook();
-    LOGD("VirtualSpoof: __system_property_get hook loaded");
-}
